@@ -62,6 +62,15 @@ SBStCodeOpener >> delete [
 ]
 
 { #category : #'as yet unclassified' }
+SBStCodeOpener >> filterEvent: anEvent for: anObject [
+
+	(anEvent isMouse and: [anEvent isMouseDown and: [(self containsPoint: anEvent position) not]]) ifTrue: [
+		self delete.
+		^ anEvent ignore].
+	^ anEvent
+]
+
+{ #category : #'as yet unclassified' }
 SBStCodeOpener >> focus: aMethodOrClass [
 
 	aMethodOrClass ifNil: [^ self].
@@ -112,6 +121,7 @@ SBStCodeOpener >> initialize [
 	showingClassSide := false.
 	
 	self
+		addMouseCaptureFilter: self;
 		height: 200;
 		changeTableLayout;
 		addDropShadow;
@@ -217,13 +227,12 @@ SBStCodeOpener >> open [
 	
 	hand keyboardFocus in: [:priorKeyboardFocus |
 		hand mouseFocus in: [:priorMouseFocus |
-			"hand newMouseFocus: self currentPanel."
+			hand newMouseFocus: nil.
 			hand newKeyboardFocus: self currentPanel.
 			
-			[[self isInWorld] whileTrue: [world doOneSubCycle]]
-				ifCurtailed: [self delete].
+			[[self isInWorld] whileTrue: [world doOneSubCycle]] ifCurtailed: [self delete].
 			
-			hand newKeyboardFocus: priorKeyboardFocus.
+			hand newKeyboardFocus: priorKeyboardFocus
 			"hand newMouseFocus: priorMouseFocus"]].
 	
 	^ result
@@ -352,7 +361,7 @@ SBStCodeOpener >> selectedMethodIndex [
 
 { #category : #'as yet unclassified' }
 SBStCodeOpener >> selectedMethodIndex: aNumber [
-	
+
 	self selectedMethodIndex: aNumber moved: true
 ]
 

@@ -89,7 +89,7 @@ Morph >> childSandblocksDo: aBlock [
 { #category : #'*Sandblocks-Core' }
 Morph >> containingSandblock [
 
-	^ self owner ifNotNil: #containingSandblock
+	^ self owner ifNotNil: [:o | o containingSandblock]
 ]
 
 { #category : #'*Sandblocks-Core' }
@@ -111,7 +111,7 @@ Morph >> cursorPositionsDo: aBlock [
 	self isSandblock ifTrue: [self insertCursorNear: nil before: false do: aBlock]
 ]
 
-{ #category : #'*Sandblocks-Core-override' }
+{ #category : #'*Sandblocks-Core-geometry-override' }
 Morph >> extent: aPoint [
 
 	(bounds extent closeTo: aPoint) ifTrue: [^ self].
@@ -122,6 +122,14 @@ Morph >> extent: aPoint [
 	self changed.
 
 	self triggerEvent: #extentChanged.
+]
+
+{ #category : #'*Sandblocks-Core-hierarchy' }
+Morph >> firstBlock [
+
+	self isSandblock ifTrue: [^ self].
+	self submorphsDo: [:morph | ^ morph firstBlock].
+	^ nil
 ]
 
 { #category : #'*Sandblocks-Core' }
@@ -352,12 +360,18 @@ Morph >> onHoverHighlight: aMorph labeled: aString [
 ]
 
 { #category : #'*Sandblocks-Core' }
+Morph >> ownerWithColor [
+
+	^ self owner ifNotNil: [:o | o ownerWithColor]
+]
+
+{ #category : #'*Sandblocks-Core' }
 Morph >> parentSandblock [
 
 	^ self owner ifNotNil: #containingSandblock
 ]
 
-{ #category : #'*Sandblocks-Core-override' }
+{ #category : #'*Sandblocks-Core-geometry-override' }
 Morph >> position: aPoint [ 
 	"Change the position of this morph, which is the top left corner of its bounds."
 	
@@ -488,7 +502,7 @@ Morph >> sandblockEditor [
 { #category : #'*Sandblocks-Core' }
 Morph >> sandblockForegroundColor [
 
-	^ self containingSandblock ifNotNil: [:b | b foregroundColor] ifNil: [color]
+	^ (self ownerWithColor ifNotNil: [:b | b foregroundColor]) ifNil: [color]
 ]
 
 { #category : #'*Sandblocks-Core' }

@@ -6,29 +6,13 @@ Class {
 		'cursor',
 		'atEnd'
 	],
-	#category : #'Sandblocks-TreeSitter'
+	#category : #'Sandblocks-TreeSitter-FFI'
 }
 
 { #category : #'as yet unclassified' }
 SBTSCursor >> atEnd [
 
 	^ atEnd
-]
-
-{ #category : #'as yet unclassified' }
-SBTSCursor >> buildMorphFor: aSlot [
-
-	| block |
-	block := SBMetaBlock new factory: self factory parentSlot: aSlot.
-	
-	self gotoFirstChild
-		ifTrue: [
-			self assert: (block slot takeFrom: self for: block).
-			self gotoParent.
-			self gotoNextSibling]
-		ifFalse: [block slot takeFrom: self for: block].
-	
-	^ block
 ]
 
 { #category : #'as yet unclassified' }
@@ -67,6 +51,13 @@ SBTSCursor >> gotoParent [
 
 	atEnd := false.
 	^ library cursorGotoParent: cursor
+]
+
+{ #category : #'as yet unclassified' }
+SBTSCursor >> initialize [
+
+	super initialize.
+	atEnd := false
 ]
 
 { #category : #'as yet unclassified' }

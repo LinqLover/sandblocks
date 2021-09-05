@@ -43,7 +43,7 @@ SBCursorInsert >> before: aBoolean [
 { #category : #'as yet unclassified' }
 SBCursorInsert >> block [
 
-	^ self container
+	^ (self adjacent ifNil: [self container]) containingSandblock
 ]
 
 { #category : #'as yet unclassified' }
@@ -114,7 +114,7 @@ SBCursorInsert >> drawOn: aCanvas in: aRectangle [
 SBCursorInsert >> enter [
 
 	super enter.
-	self triggerEvent: #showLabel with: (command title ifNil: ['insert in ', self block printString])
+	self triggerEvent: #showLabel with: (command title ifNil: ['insert in ', self container printString])
 ]
 
 { #category : #'as yet unclassified' }
@@ -172,7 +172,7 @@ SBCursorInsert >> objectInterface [
 { #category : #'as yet unclassified' }
 SBCursorInsert >> selectLarger [
 
-	^ SBCursorSelect new block: self container
+	^ SBCursorSelect new block: self container containingSandblock
 ]
 
 { #category : #'as yet unclassified' }
@@ -186,6 +186,6 @@ SBCursorInsert >> unhandledEvent: anEvent in: anEditor didHandle: aBlock [
 
 	anEditor do: command.
 	anEditor selection inputContainedUnknown.
-	anEditor selection keyStroke: anEvent.
+	command continueAfterInsert ifTrue: [anEditor selection keyStroke: anEvent].
 	aBlock value
 ]

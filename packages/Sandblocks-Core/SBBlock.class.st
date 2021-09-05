@@ -168,21 +168,25 @@ SBBlock >> artefactCompletionSelectorsFor: aBlock class: aClass [
 
 { #category : #suggestions }
 SBBlock >> artefactCompletionSuggestionsFor: aBlock matching: aString [
-	 
-	| allMatches exactMatches fuzzyMatches selectors |
-	selectors := self artefactCompletionSelectorsFor: aBlock class: aBlock guessClassExpensive.
+
+	| exactMatches fuzzyMatches selectors list |
+	selectors := OrderedCollection withAll: (self artefactCompletionSelectorsFor: aBlock class: aBlock guessClassExpensive).
+	exactMatches := (Array streamContents: [:stream |
+		selectors removeAllSuchThat: [:sel |
+			(sel sandblockBeginsWith: aString)
+				ifTrue: [stream nextPut: sel];
+				yourself]]) sort: #size ascending.
+	fuzzyMatches := (Array streamContents: [:stream |
+		selectors removeAllSuchThat: [:sel |
+			(sel sandblockMatch: aString)
+				ifTrue: [stream nextPut: sel];
+				yourself]]) sort: #size ascending.
+	list := exactMatches, fuzzyMatches, (self sandblockEditor suggestAlways ifTrue: [selectors] ifFalse: [#()]).
 	
-	exactMatches := Array streamContents: [:stream |
-		selectors do: [:sel |
-			(sel asString sandblockBeginsWith: aString) ifTrue: [stream nextPut: sel asString]]].
-	fuzzyMatches := Array streamContents: [:stream |
-		selectors do: [:sel |
-			(sel asString sandblockMatch: aString) ifTrue: [stream nextPut: sel asString]]].
-	allMatches := Array streamContents: [:stream |
-		selectors do: [:sel |
-			stream nextPut: sel asString]].
+	"add outer artefact's selector, if any, to support recursion of not-yet-saved methods"
+	self ifNotNil: [:artefact | artefact selector ifNotNil: [:sel | (sel sandblockMatch: aString) ifTrue: [list := (list copyWithout: sel) copyWithFirst: sel]]].
 	
-	^ (exactMatches, fuzzyMatches, allMatches) withoutDuplicates
+	^ list
 ]
 
 { #category : #accessing }
@@ -447,7 +451,7 @@ SBBlock >> click: anEvent [
 	
 	self sandblockEditor selectClick: self at: anEvent position.
 	(anEvent yellowButtonPressed and: [SBPreferences rightClickContextMenu]) ifTrue: [self promptAction].
-	(self suggestAlways and: [anEvent redButtonPressed]) ifTrue: [self toggleSuggestions].
+	(self isInWorld and: [self suggestAlways and: [anEvent redButtonPressed]]) ifTrue: [self toggleSuggestions]
 ]
 
 { #category : #hierarchy }
@@ -494,12 +498,11 @@ SBBlock >> completeSubtree [
 { #category : #suggestions }
 SBBlock >> completionSuggestionsFor: aString [
 
-	(self suggestAlways or: [aString size > 2])
-		ifFalse: [^ #()].
+	(self suggestAlways or: [aString size > 2]) ifFalse: [^ #()].
 	
 	^ self containingArtefact
-		artefactCompletionSuggestionsFor: self
-		matching: aString
+		ifNotNil: [:a | a artefactCompletionSuggestionsFor: self matching: aString]
+		ifNil: [#()]
 ]
 
 { #category : #accessing }
@@ -723,7 +726,8 @@ SBBlock >> deleteAround [
 			replacer postDuplicate.
 			^ self].
 		" if we did not find a valid conversion, try again with the parent "
-		target := target parentSandblock ifNil: [^ self]] repeat
+		target := target parentSandblock.
+		(target isNil or: [target floating and: [target isArtefact]]) ifTrue: [^ self]] repeat
 ]
 
 { #category : #actions }
@@ -781,7 +785,7 @@ SBBlock >> deleteCommandFor: aBlock [
 	^ (self canDeleteChild: aBlock)
 		ifTrue: [SBDeleteCommand new target: aBlock]
 		ifFalse: [
-			aBlock newNullBlock ifNotNil: [:nullBlock |
+			self newNullBlock ifNotNil: [:nullBlock |
 				SBReplaceCommand new
 					target: aBlock;
 					replacer: nullBlock]]
@@ -817,6 +821,8 @@ SBBlock >> detachDecoratorsThat: aBlock [
 { #category : #actions }
 SBBlock >> dismiss [
 	<action>
+
+	self removeSuggestionMenu
 ]
 
 { #category : #drawing }
@@ -930,6 +936,14 @@ SBBlock >> endInput [
 	<inputAction>
 
 	self sandblockEditor endInput
+]
+
+{ #category : #actions }
+SBBlock >> endMultiSelection [
+	<action>
+	<actionValidIf: #hasMultiSelection>
+
+	self select
 ]
 
 { #category : #decorators }
@@ -1123,9 +1137,15 @@ SBBlock >> hasInput [
 ]
 
 { #category : #'actions tests' }
+SBBlock >> hasMultiSelection [
+
+	^ self sandblockEditor cursor cursorPosition isKindOf: SBCursorMultiSelect
+]
+
+{ #category : #'actions tests' }
 SBBlock >> hasMultipleSuggestions [
 
-	^ self hasSuggestions and: [(self valueOfProperty: #sandblockSuggestionMenu) submorphCount > 1]
+	^ self hasSuggestions and: [(self valueOfProperty: #sandblockSuggestionMenu) itemCount > 1]
 ]
 
 { #category : #'actions tests' }
@@ -1166,10 +1186,7 @@ SBBlock >> inputContainedUnknown [
 	<action>
 	<inputAction>
 
-	(self wantsInput ifTrue: [self] ifFalse: [self nextBlockThat: [:m | m wantsInput]])
-		ifNotNil: [:m |
-			((m hasOwner: self) or: [m = self]) ifTrue: [
-				self sandblockEditor startInput: m at: 1 replacingContents: true]]
+	(self wantsInput ifTrue: [self] ifFalse: [self nextBlockThat: [:m | m wantsInput]]) ifNotNil: [:m | ((m hasOwner: self) or: [m = self]) ifTrue: [self sandblockEditor startInput: m at: 1 replacingContents: false]]
 ]
 
 { #category : #actions }
@@ -1177,10 +1194,7 @@ SBBlock >> inputNextUnknown [
 	<action>
 	<inputAction>
 
-	(self nextBlockThat: [:m | m wantsInput])
-		ifNotNil: [:m |
-			self containingFloat = m containingFloat ifTrue: [
-				self sandblockEditor startInput: m at: 1 replacingContents: true]]
+	(self nextBlockThat: [:m | m wantsInput]) ifNotNil: [:m | self containingFloat = m containingFloat ifTrue: [self sandblockEditor startInput: m at: 1 replacingContents: false]]
 ]
 
 { #category : #actions }
@@ -1382,6 +1396,12 @@ SBBlock >> isInEditor [
 	| editor |
 	editor := self sandblockEditor.
 	^ editor notNil and: [editor isSelection not or: [editor parentSandblock ifNotNil: #isInEditor ifNil: [false]]]
+]
+
+{ #category : #'Sandblocks-TreeSitter' }
+SBBlock >> isInlineBlock [
+
+	^ false
 ]
 
 { #category : #'testing hierarchy' }
@@ -1802,6 +1822,12 @@ SBBlock >> outerMostArtefact [
 ]
 
 { #category : #hierarchy }
+SBBlock >> ownerWithColor [
+
+	^ self
+]
+
+{ #category : #hierarchy }
 SBBlock >> parentAdjacentBlock: aNumber [
 
 	^ (self adjacentBlock: aNumber)
@@ -1835,7 +1861,8 @@ SBBlock >> pasteBeforeOrAfter: aBeforeBoolean [
 		copyBufferForContext: (self parentSandblock
 			objectInterfaceNear: self
 			at: (aBeforeBoolean ifTrue: [#before] ifFalse: [#after]))
-		reversedDo: [:repr :index :isLast | self sandblockEditor do: ((self parentSandblock insertCommandRequest: repr near: self before: aBeforeBoolean) shouldMergeWithNext: isLast not)]
+		reversed: true
+		do: [:repr :index :isLast | self sandblockEditor do: ((self parentSandblock insertCommandRequest: repr near: self before: aBeforeBoolean) shouldMergeWithNext: isLast not)]
 		ifWrappingDo: [:block | self wrapSelectionWith: block unpackSelection veryDeepCopy]
 ]
 
@@ -1850,7 +1877,8 @@ SBBlock >> pasteReplace [
 		copyBufferForContext: ((position isKindOf: SBCursorInsert)
 			ifTrue: [position objectInterface]
 			ifFalse: [self objectInterface])
-		reversedDo: [:block :index :isLast |
+		reversed: ((position isKindOf: SBCursorInsert) and: [position adjacent notNil])
+		do: [:block :index :isLast |
 			(position isKindOf: SBCursorInsert)
 				ifTrue: [
 					editor do: ((position container
@@ -2052,7 +2080,7 @@ SBBlock >> reloadArtefact [
 	<action>
 
 	
-	self isArtefact ifFalse: [self containingArtefact reloadArtefact]
+	self isArtefact ifFalse: [self containingArtefact ifNotNil: #reloadArtefact]
 ]
 
 { #category : #'colors and color policies' }
@@ -2189,7 +2217,9 @@ SBBlock >> selectArtefact [
 
 	(self containingArtefact = self
 		ifTrue: [self parentSandblock containingArtefact]
-		ifFalse: [self containingArtefact]) ifNotNil: #select
+		ifFalse: [self containingArtefact])
+		ifNotNil: #select
+		ifNil: [self containingFloat ifNotNil: #select]
 ]
 
 { #category : #actions }
@@ -2375,7 +2405,10 @@ SBBlock >> startInputAtEnd [
 		ifNotNil: [self]
 		ifNil: [self lastMorphThat: [:b | b isSandblock and: [b startInputCommand notNil]]])
 		ifNotNil: [:b | self sandblockEditor startInput: b at: 900000000 replacingContents: false]
-		ifNil: [self lastDeepChild select]
+		ifNil: [
+			self lastDeepChild select.
+			" try and move into an insert position "
+			self sandblockEditor performForSelection: #moveCursorSmaller]
 ]
 
 { #category : #actions }
@@ -2572,7 +2605,7 @@ SBBlock >> updateSuggestions: aCollection showNear: aMorph [
 	
 	self suggestionsMenu
 		editor: self sandblockEditor;
-		suggestions: (aCollection take: 1000);
+		suggestions: (aCollection take: 30);
 		topLeft: aMorph positionInWorld + (0 @ aMorph height).
 	
 	self world ifNotNil: [

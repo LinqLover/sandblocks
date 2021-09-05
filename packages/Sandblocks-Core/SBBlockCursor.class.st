@@ -101,9 +101,6 @@ SBBlockCursor >> cursorPosition: aPosition explicitMove: aBoolean axis: aSymbol 
 		previousBlock removeActionsWithReceiver: self.
 		previousBlock ifNotNil: #wasDeselected.
 		lastBlinkTime := Time current.
-		self selectedBlock
-			when: #positionChanged send: #updateBounds to: self;
-			when: #extentChanged send: #updateBounds to: self.
 		self selectedBlock ifNotNil: [:b |
 			b
 				wasSelected;
@@ -222,11 +219,13 @@ SBBlockCursor >> moveCursorClick: aBlock at: aPoint [
 SBBlockCursor >> moveCursorDown [
 	<globalAction>
 
-	self nextVertical ifNotNil: [:next |
-		self
-			cursorPosition: (self cursorForBlock: next at: (self idealPixelPositionEnterNear: #top for: next))
-			explicitMove: true
-			axis: #y]
+	self nextVertical
+		ifNotNil: [:next |
+			self
+				cursorPosition: (self cursorForBlock: next at: (self idealPixelPositionEnterNear: #top for: next))
+				explicitMove: true
+				axis: #y]
+		ifNil: [self moveCursorSmaller]
 ]
 
 { #category : #api }
@@ -328,8 +327,8 @@ SBBlockCursor >> multiSelection: aCollection [
 SBBlockCursor >> nextVertical [
 
 	^ self
-		adjacentVerticalCalcDistance: [:candidate | candidate top - cursorPosition bounds bottom]
-		validBlock: [:candidate | candidate top >= cursorPosition bounds bottom]
+		adjacentVerticalCalcDistance: [:candidate | candidate top - cursorPosition selectionBounds bottom]
+		validBlock: [:candidate | candidate top >= cursorPosition selectionBounds bottom]
 ]
 
 { #category : #api }
@@ -343,8 +342,8 @@ SBBlockCursor >> prepareForNextCommand [
 SBBlockCursor >> previousVertical [
 
 	^ self
-		adjacentVerticalCalcDistance: [:candidate | cursorPosition bounds top - candidate bottom]
-		validBlock: [:candidate | cursorPosition bounds top >= candidate bottom]
+		adjacentVerticalCalcDistance: [:candidate | cursorPosition selectionBounds top - candidate bottom]
+		validBlock: [:candidate | cursorPosition selectionBounds top >= candidate bottom]
 ]
 
 { #category : #'events-processing' }

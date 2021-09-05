@@ -222,7 +222,7 @@ SBStNameBehavior >> updateSuggestions [
 		text first isUppercase
 			ifTrue: [self uppercaseSuggestions]
 			ifFalse: [self lowercaseSuggestions]].
-	self block updateSuggestions: suggestions showNear: self block
+	self block updateSuggestions: (suggestions sort: #selectorSize ascending) showNear: self block
 ]
 
 { #category : #'as yet unclassified' }
@@ -249,4 +249,16 @@ SBStNameBehavior >> valid [
 SBStNameBehavior >> validBinding [
 
 	^ true
+]
+
+{ #category : #'as yet unclassified' }
+SBStNameBehavior >> wasDeselected [
+
+	
+]
+
+{ #category : #'as yet unclassified' }
+SBStNameBehavior >> wasSelected [
+
+	
 ]

@@ -406,14 +406,16 @@ SBEditor >> copyBuffer: aMorphOrCollection [
 ]
 
 { #category : #accessing }
-SBEditor >> copyBufferForContext: anInterface reversedDo: aBlock ifWrappingDo: aWrapBlock [
+SBEditor >> copyBufferForContext: anInterface reversed: aBoolean do: aBlock ifWrappingDo: aWrapBlock [
 
 	^ (copyBuffer notNil and: [copyBuffer unpackSelection textContentsForCopy = Clipboard clipboardText string])
 		ifTrue: [
 			copyBuffer wrapsAround
 				ifTrue: [aWrapBlock value: copyBuffer unpackSelection veryDeepCopy]
-				ifFalse: [
-					copyBuffer submorphs veryDeepCopy reversed withIndexDo: [:morph :index |
+				ifFalse: [ | list |
+					list := copyBuffer submorphs veryDeepCopy.
+					aBoolean ifTrue: [list := list reversed].
+					list withIndexDo: [:morph :index |
 						morph
 							convertedFor: anInterface
 							do: [:repr | aBlock cull: repr cull: index cull: index = copyBuffer submorphCount]]]]
@@ -819,14 +821,16 @@ SBEditor >> insertCommandRequest: aMorph near: aBlock before: aBoolean [
 { #category : #input }
 SBEditor >> interruptInputDuring: aBlock [
 
-	| cursor |
+	| cursor selected |
 	self selection ifNil: [^ aBlock value].
 	
-	cursor := self selection currentTextMorph ifNotNil: #cursor.
+	selected := self selection.
+	cursor := selected currentTextMorph ifNotNil: #cursor.
+	
 	self endInput.
 	aBlock value.
-	cursor ifNotNil: [
-		self selection ifNotNil: [self startInput: self selection at: cursor replacingContents: false]]
+	
+	(cursor notNil and: [self selection = selected]) ifTrue: [self startInput: selected at: cursor replacingContents: false]
 ]
 
 { #category : #testing }
@@ -869,16 +873,22 @@ SBEditor >> loadBlocks [
 
 { #category : #'do/undo/redo' }
 SBEditor >> markChangesAfterCommand: artefacts [
-
+	 
 	artefacts do: [:candidate | | artefact |
 		artefact := candidate canPersist
 			ifTrue: [candidate]
 			ifFalse: [candidate artefactForPersisting ifNil: [candidate]].
 		
-		(self compileTime = #compileOnChange and: [self save: artefact tryFixing: false quick: false]) ifTrue: [history markSaved: true].
+		(self compileTime = #compileOnChange and: [self save: artefact tryFixing: false quick: false]) ifTrue: [self markSaved: true].
 		
 		artefact triggerEvent: #changed.
 		self allBlocksDo: [:block | block artefactChanged: artefact]]
+]
+
+{ #category : #'as yet unclassified' }
+SBEditor >> markSaved: anArtefact [
+
+	^ history markSaved: anArtefact
 ]
 
 { #category : #accessing }
@@ -1033,7 +1043,7 @@ SBEditor >> openInWindow [
 	window := self embeddedInMorphicWindowLabeled: self labelString.
 	window model: self.
 	
-	window := window openInWorldExtent: self extent.
+	window := window openInWorldExtent: self fullBounds extent + window layoutInset asEdgeInsets horizontal.
 	Project uiManager openToolsAttachedToMouseCursor ifTrue: [
 		window setProperty: #initialDrop toValue: true.
 		window hasDropShadow: false.
@@ -1281,10 +1291,10 @@ SBEditor >> save [
 
 { #category : #artefacts }
 SBEditor >> save: anArtefact tryFixing: aFixBoolean quick: aQuickBoolean [
-
+	 
 	^ (anArtefact saveTryFixing: aFixBoolean quick: aQuickBoolean)
 		ifTrue: [
-			history markSaved: anArtefact.
+			self markSaved: anArtefact.
 			self triggerEvent: #artefactSaved with: anArtefact.
 			self allBlocksDo: [:block | block artefactSaved: anArtefact].
 			true]
