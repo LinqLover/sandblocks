@@ -20,6 +20,23 @@ SBStASTNode class >> preferredColor [
 	^ Color r: 0.216 g: 0.249 b: 0.436
 ]
 
+{ #category : #'as yet unclassified' }
+SBStASTNode class >> registerShortcuts: aProvider [
+
+	aProvider
+		cmdShortcut: $" do: #wrapInToggledCode;
+		registerShortcut: $[ do: #wrapInBlock;
+		registerShortcut: ${ do: #wrapInDynamicArray;
+		cmdShortcut: $: do: #wrapInAssignment;
+		registerShortcut: $; do: #wrapInCascade;
+		registerShortcut: $^ do: #wrapInReturn;
+		cmdShortcut: $' do: #useAsStString;
+		cmdShortcut: $# do: #useAsStSymbol;
+		cmdShortcut: $$ do: #useAsStCharacter;
+		shortcut: Character space shift modes: #(#input #command) do: #wrapAsArgument;
+		shortcut: Character space modes: #(#input #command) do: #wrapInMessageSend
+]
+
 { #category : #'action helpers' }
 SBStASTNode >> actionProviders [
 
@@ -40,6 +57,12 @@ SBStASTNode >> asMorphBlock: converter [
 	<convert>
 	
 	" we can't generally convert ourselves to morphs since we need our artefact owner "
+]
+
+{ #category : #testing }
+SBStASTNode >> canEvaluate [
+
+	^ self isExpression
 ]
 
 { #category : #evaluate }
@@ -110,7 +133,18 @@ SBStASTNode >> grammarHandler [
 { #category : #accessing }
 SBStASTNode >> guessClassExpensive [
 
-	^ self guessedClass ifNil: [[(SBStSandboxSimulator new simulate: [self evaluate]) ifNotNil: #class] on: Error do: [nil]]
+	^ self guessedClass ifNil: [
+		Smalltalk at: #Sandbox ifPresent: [:sandboxClass |
+			[
+				sandboxClass new
+					stepLimit: 100000;
+					evaluate: [
+							self evaluate ifNotNil: [:result |
+								[result class] on: MessageNotUnderstood do: ["might be ProtoObject"
+								thisContext objectClass: result]]]
+						ifFailed: [nil]]
+				on: (Smalltalk at: #SandboxError)
+				do: [:err | nil]]]
 ]
 
 { #category : #accessing }

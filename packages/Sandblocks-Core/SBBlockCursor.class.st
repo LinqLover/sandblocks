@@ -22,7 +22,7 @@ SBBlockCursor >> adjacentVerticalCalcDistance: aDistBlock validBlock: aValidBloc
 	
 	float := self selectedBlock containingFloat.
 	tolerance := 10.
-	allCandidates := Array streamContents: [:stream | float allVisibleMorphsDo: [:candidate | ((candidate isTextMorph or: [candidate isSandblock and: [candidate hasChildSandblocks not]]) and: [aValidBlock value: candidate]) ifTrue: [stream nextPut: candidate]]].
+	allCandidates := Array streamContents: [:stream | float allVisibleMorphsDo: [:candidate | ((candidate isTextMorph or: [candidate isSandblock and: [candidate hasChildSandblocks not and: [candidate isSelectable]]]) and: [aValidBlock value: candidate]) ifTrue: [stream nextPut: candidate]]].
 	candidates := OrderedCollection new.
 	candidatesBestDistance := 900000000.
 	allCandidates do: [:candidate | | distance |
@@ -100,7 +100,7 @@ SBBlockCursor >> cursorPosition: aPosition explicitMove: aBoolean axis: aSymbol 
 	self selectedBlock ~= previousBlock ifTrue: [
 		previousBlock removeActionsWithReceiver: self.
 		previousBlock ifNotNil: #wasDeselected.
-		lastBlinkTime := Time current.
+		lastBlinkTime := DateAndTime current.
 		self selectedBlock ifNotNil: [:b |
 			b
 				wasSelected;
@@ -219,13 +219,7 @@ SBBlockCursor >> moveCursorClick: aBlock at: aPoint [
 SBBlockCursor >> moveCursorDown [
 	<globalAction>
 
-	self nextVertical
-		ifNotNil: [:next |
-			self
-				cursorPosition: (self cursorForBlock: next at: (self idealPixelPositionEnterNear: #top for: next))
-				explicitMove: true
-				axis: #y]
-		ifNil: [self moveCursorSmaller]
+	cursorPosition moveCursorDown: self
 ]
 
 { #category : #api }
@@ -285,11 +279,7 @@ SBBlockCursor >> moveCursorSmaller [
 SBBlockCursor >> moveCursorUp [
 	<globalAction>
 
-	self previousVertical ifNotNil: [:previous |
-		self
-			cursorPosition: (self cursorForBlock: previous at: (self idealPixelPositionEnterNear: #bottom for: previous))
-			explicitMove: true
-			axis: #y]
+	cursorPosition moveCursorUp: self
 ]
 
 { #category : #private }
@@ -363,10 +353,16 @@ SBBlockCursor >> resetBlink [
 
 	blinkCount := 0.
 	cursorShown := true.
+	lastBlinkTime := DateAndTime now.
 	self editor ifNotNil: [:e |
 		e world ifNotNil: [:w |
 			w stopStepping: self.
-			w startStepping: self at: Time millisecondClockValue + self stepTime selector: #step arguments: {} stepTime: self stepTime]]
+			w
+				startStepping: self
+				at: Time millisecondClockValue + self stepTime
+				selector: #step
+				arguments: {}
+				stepTime: self stepTime]]
 ]
 
 { #category : #drawing }
@@ -435,8 +431,11 @@ SBBlockCursor >> step [
 	| oldVisible now |
 	oldVisible := self cursorVisible.
 	
-	now := Time current.
-	(lastBlinkTime isNil or: [((lastBlinkTime addSeconds: 0.5) < now)]) ifTrue: [
+	now := DateAndTime current.
+	" crude upgrade helper "
+	lastBlinkTime class = Time ifTrue: [lastBlinkTime := now].
+	
+	(lastBlinkTime isNil or: [(lastBlinkTime + 0.5 seconds) < now]) ifTrue: [
 		lastBlinkTime := now.
 		cursorShown := cursorShown not.
 		blinkCount := blinkCount + 1].
@@ -466,7 +465,16 @@ SBBlockCursor >> unhandledEvent: anEvent in: anEditor didHandle: aBlock [
 { #category : #'as yet unclassified' }
 SBBlockCursor >> updateBounds [
 
-	^ self bounds: cursorPosition bounds
+	| b |
+	b := cursorPosition bounds.
+	^ self bounds: (cursorPosition block
+		ifNotNil: [:block | | referenceMorph |
+			block = self sandblockEditor
+				ifTrue: [self owner offset extent: self owner extent]
+				ifFalse: [
+					referenceMorph := block ownerSatisfying: [:o | o owner = self owner].
+					referenceMorph ifNil: [b] ifNotNil: [block bounds: b in: referenceMorph]]]
+		ifNil: [b])
 ]
 
 { #category : #'vertical movement' }

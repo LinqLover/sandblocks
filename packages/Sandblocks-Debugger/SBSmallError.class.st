@@ -19,6 +19,7 @@ SBSmallError >> click: anEvent [
 { #category : #'as yet unclassified' }
 SBSmallError >> currentBlock [
 
+	self flag: #todo. " breaks for processes that timed out and have a very deep stack "
 	process suspendedContext findContextSuchThat: [:context |
 		self sandblockEditor
 			blockFor: context method homeMethod
@@ -39,11 +40,13 @@ SBSmallError >> drawOn: aCanvas [
 ]
 
 { #category : #'as yet unclassified' }
-SBSmallError >> error: anError process: aProcess [
+SBSmallError >> error: anError process: aProcess source: anExecutableEnvironment [
 
 	error := anError.
 	process := aProcess.
-	self balloonText: anError asString
+	self balloonText: anError asString.
+	
+	anExecutableEnvironment ifNotNil: [anExecutableEnvironment when: #outOfWorld send: #delete to: self]
 ]
 
 { #category : #'as yet unclassified' }

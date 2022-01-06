@@ -2,7 +2,9 @@ Class {
 	#name : #SBComboBox,
 	#superclass : #SBTextBubble,
 	#instVars : [
-		'values'
+		'values',
+		'tooltips',
+		'labels'
 	],
 	#category : #'Sandblocks-Core'
 }
@@ -16,6 +18,23 @@ SBComboBox >> activate [
 ]
 
 { #category : #'as yet unclassified' }
+SBComboBox >> chooseMorphs: aCollection [
+
+	| dialog |
+	dialog := DialogWindow new
+		title: 'Please Choose';
+		message: '';
+		filterEnabled: true;
+		autoCancel: true;
+		yourself.
+	"Like a pop-up menu, click anywhere to dismiss."
+	aCollection withIndexDo: [:ea :index | dialog createButton: ea value: index].
+	tooltips ifNotNil: [tooltips with: dialog buttons do: [:tooltip :button | button balloonText: tooltip]].
+	dialog selectedButtonIndex: 1.
+	^ dialog getUserResponseAtHand
+]
+
+{ #category : #'as yet unclassified' }
 SBComboBox >> currentTextMorph [
 
 	^ nil
@@ -24,6 +43,8 @@ SBComboBox >> currentTextMorph [
 { #category : #'as yet unclassified' }
 SBComboBox >> display: anObject [
 
+	anObject isMorph ifTrue: [^ anObject imageForm].
+	anObject isString ifTrue: [^ anObject].
 	^ anObject printString
 ]
 
@@ -38,6 +59,18 @@ SBComboBox >> keyStroke: anEvent [
 ]
 
 { #category : #'as yet unclassified' }
+SBComboBox >> labels [
+
+	^ labels
+]
+
+{ #category : #'as yet unclassified' }
+SBComboBox >> labels: aCollection [
+
+	labels := aCollection
+]
+
+{ #category : #'as yet unclassified' }
 SBComboBox >> object [
 
 	^ object
@@ -47,19 +80,37 @@ SBComboBox >> object [
 SBComboBox >> object: anObject [
 
 	object := anObject.
-	self contents: (self display: object)
+	anObject ifNotNil: [ | actualLabels |
+		self labels
+			ifNotNil: [
+				actualLabels := self labels ifNil: [self values].
+				self contents: (self display: (actualLabels at: (self values indexOf: anObject)))]
+			ifNil: [self contents: (self display: anObject) asString]]
 ]
 
 { #category : #'as yet unclassified' }
 SBComboBox >> promptChangeValue [
 
-	| index |
-	index := UIManager default chooseFrom: self values.
-	index > 0 ifTrue: [
+	| choice actualLabels |
+	actualLabels := self labels ifNil: [self values].
+	choice := (actualLabels allSatisfy: [:val | val isMorph or: [val isForm]])
+		ifTrue: [(self chooseMorphs: actualLabels) ifNotNil: [:index | self values at: index]]
+		ifFalse: [
+			UIManager default
+				chooseFrom: (actualLabels collect: [:obj | self display: obj])
+				values: self values].
+	
+	choice ifNotNil: [
 		self sandblockEditor do: (SBMutatePropertyCommand new
 			target: self;
 			selector: #object;
-			value: (self values at: index))]
+			value: choice)]
+]
+
+{ #category : #'as yet unclassified' }
+SBComboBox >> tooltips: aCollection [
+
+	tooltips := aCollection
 ]
 
 { #category : #'as yet unclassified' }

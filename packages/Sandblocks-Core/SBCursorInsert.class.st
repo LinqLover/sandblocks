@@ -5,7 +5,8 @@ Class {
 		'command',
 		'before',
 		'adjacent',
-		'container'
+		'container',
+		'bounds'
 	],
 	#category : #'Sandblocks-Core'
 }
@@ -49,6 +50,8 @@ SBCursorInsert >> block [
 { #category : #'as yet unclassified' }
 SBCursorInsert >> bounds [
 
+	bounds ifNotNil: [^ bounds].
+	
 	^ self container hasHorizontalLayout
 		ifTrue: [
 			self adjacent
@@ -72,6 +75,12 @@ SBCursorInsert >> bounds [
 					self before
 						ifTrue: [self adjacent topLeft - (0 @ (self lineWidth // 2)) extent: self adjacent width @ self lineWidth]
 						ifFalse: [self adjacent bottomLeft extent: self adjacent width @ self lineWidth]]]
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorInsert >> bounds: aRectangle [
+
+	bounds := aRectangle
 ]
 
 { #category : #'as yet unclassified' }
@@ -185,7 +194,18 @@ SBCursorInsert >> selectSmaller [
 SBCursorInsert >> unhandledEvent: anEvent in: anEditor didHandle: aBlock [
 
 	anEditor do: command.
-	anEditor selection inputContainedUnknown.
-	command continueAfterInsert ifTrue: [anEditor selection keyStroke: anEvent].
+	SBToggledCode comment: '' active: 1 do: {
+		[ | position |
+			position := nil.
+			(command respondsTo: #morph)
+				ifTrue: [
+					command morph cursorPositionsDo: [:pos | " pick the first that is not a select, skipping over positions
+that would cause the same insert as us"
+					((position isNil or: [position isKindOf: SBCursorSelect]) and: [(pos isKindOf: SBCursorInsert) not or: [pos container ~= self container]]) ifTrue: [position := pos]].
+					position ifNotNil: [anEditor cursor cursorPosition: position explicitMove: false axis: #none]]
+				ifFalse: [anEditor selection inputContainedUnknown]].
+		[anEditor performAction: #moveCursorSmaller].
+		[anEditor selection inputContainedUnknown]}.
+	(command continueAfterInsert: anEvent keyCharacter) ifTrue: [anEditor handle: anEvent].
 	aBlock value
 ]

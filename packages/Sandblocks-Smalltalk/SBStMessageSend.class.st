@@ -172,25 +172,27 @@ SBStMessageSend >> expression [
 SBStMessageSend >> fixActions [
 
 	^ self isDefined not
-		ifTrue: [ | class |
-			class := self actualReceiver guessClassExpensive.
-			{
-				SBCodeAction
-					labeled: 'Create method on ', (class ifNotNil: #name ifNil: ['...'])
-					for: self
-					do: [:node | | method |
-						method := SBStMethod new
-							selector: self selector
-								arguments: (self arguments collectWithIndex: [:arg :index | arg isName ifTrue: [arg veryDeepCopy] ifFalse: [SBStName contents: 'anObject', index asString]])
-								class: (class ifNil: [UIManager default chooseClassOrTrait ifNil: [^ self]]);
-							body: SBStBlockBody new.
-						
-						self sandblockEditor do: (SBEditorOpenMorphCommand new
-							morph: method;
-							editor: self sandblockEditor;
-							isUnsaved: true;
-							yourself)].
-				SBCodeAction labeled: 'Confirm selector' for: self do: [:node | node selector asSymbol]}]
+		ifTrue: [
+			(self actualReceiver guessClassExpensive ifNil: [UIManager default chooseClassOrTrait])
+				ifNotNil: [:class |
+					{
+						SBCodeAction
+							labeled: 'Create method on ', (class ifNotNil: #name ifNil: ['...'])
+							for: self
+							do: [:node | | method |
+								method := SBStMethod new
+									selector: self selector
+										arguments: (self arguments collectWithIndex: [:arg :index | arg isName ifTrue: [arg veryDeepCopy] ifFalse: [SBStName contents: 'anObject', index asString]])
+										class: class;
+									body: SBStBlockBody new.
+								
+								self sandblockEditor do: (SBEditorOpenMorphCommand new
+									morph: method;
+									editor: self sandblockEditor;
+									isUnsaved: true;
+									yourself)].
+						SBCodeAction labeled: 'Confirm selector' for: self do: [:node | node selector asSymbol]}]
+				ifNil: [{}]]
 		ifFalse: [#()]
 ]
 
@@ -595,12 +597,10 @@ SBStMessageSend >> validSelector [
 { #category : #'as yet unclassified' }
 SBStMessageSend >> veryDeepCopyWith: deepCopier [
 
-	" assure that copies of us have a unique id "
 	| new |
+	" assure that copies of us have a unique id "
 	new := super veryDeepCopyWith: deepCopier.
-	self receiver ifNil: [
-		self assert: self isInCascade.
-		new receiver: self owner receiver veryDeepCopy].
+	self receiver ifNil: [new receiver: self newNullBlock].
 	^ new
 ]
 

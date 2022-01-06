@@ -23,9 +23,13 @@ SBPaletteContainer class >> matchesBlock: aBlock [
 
 { #category : #'as yet unclassified' }
 SBPaletteContainer >> addBlock: aString as: aBlock [
-	"addMorphBack: (SBStringMorph new contents: aString);"
 
-	content addMorphBack: (self container: aBlock label: aString)
+	| block |
+	"addMorphBack: (SBStringMorph new contents: aString);"
+	block := (aBlock isInlineBlock and: [aBlock factory rootRuleName = aBlock type])
+		ifTrue: [aBlock childSandblocks first]
+		ifFalse: [aBlock].
+	content addMorphBack: (self container: block label: aString)
 ]
 
 { #category : #'as yet unclassified' }
@@ -81,7 +85,9 @@ SBPaletteContainer >> initialize [
 	super initialize.
 	
 	self
-		addMorphBack: (categories := SBColumn new layoutInset: 4);
+		addMorphBack: (categories := SBColumn new
+			layoutInset: 4;
+			cellPositioning: #topLeft);
 		addMorphBack: (ScrollPane new
 			color: Color transparent;
 			hResizing: #spaceFill;
