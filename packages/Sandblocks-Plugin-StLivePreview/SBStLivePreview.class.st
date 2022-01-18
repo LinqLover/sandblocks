@@ -1,9 +1,10 @@
 Class {
 	#name : #SBStLivePreview,
-	#superclass : #SBBlock,
+	#superclass : #SBPopup,
 	#instVars : [
 		'scheduler',
-		'editor'
+		'editor',
+		'errorDecorator'
 	],
 	#category : #'Sandblocks-Plugin-StLivePreview'
 }
@@ -43,7 +44,7 @@ SBStLivePreview >> click: anEvent [
 
 	| target |
 	target := self blockForLookup: editor selection.
-	target ifNotNil: [self valueForBlock: target ifFound: [:res | res explore] onTimeout: [] onError: [:err | ]]
+	target ifNotNil: [self valueForBlock: target ifFound: [:res | res explore] onTimeout: [] onError: [:err | err explore]]
 ]
 
 { #category : #'as yet unclassified' }
@@ -51,6 +52,18 @@ SBStLivePreview >> editor: anEditor [
 
 	editor := anEditor.
 	anEditor when: #selectionChanged send: #selection: to: self
+]
+
+{ #category : #'as yet unclassified' }
+SBStLivePreview >> executeCurrentExampleIfFound: foundBlock onTimeout: timeoutBlock onError: errorBlock [
+
+	| env |
+	env := (SBExecutionEnvironment getAllIn: editor) first.
+	^ [[env execute] valueWithin: self timeout onTimeout: [timeoutBlock value]]
+		on: SBStRunUntilValue
+		do: [:val | foundBlock value: val value]
+		on: Error, Halt, TestFailure
+		do: [:ex | errorBlock value: ex]
 ]
 
 { #category : #presentation }
@@ -66,16 +79,7 @@ SBStLivePreview >> initialize [
 	
 	self
 		addMorphBack: SBIcon iconInfoCircle;
-		addMorphBack: SBStringMorph new;
-		changeTableLayout;
-		listDirection: #leftToRight;
-		cellGap: 4;
-		hResizing: #shrinkWrap;
-		vResizing: #shrinkWrap;
-		color: (Color r: 1 g: 1 b: 1);
-		layoutInset: 4;
-		disableLayout: true;
-		addDropShadow
+		addMorphBack: SBStringMorph new
 ]
 
 { #category : #presentation }
@@ -91,21 +95,9 @@ SBStLivePreview >> label [
 ]
 
 { #category : #presentation }
-SBStLivePreview >> morphicLayerNumber [
-
-	^ 99
-]
-
-{ #category : #presentation }
 SBStLivePreview >> mouseCursorAt: anEvent [
 
 	^ Cursor execute
-]
-
-{ #category : #presentation }
-SBStLivePreview >> preventOcclusion [
-
-	^ false
 ]
 
 { #category : #'as yet unclassified' }
@@ -114,6 +106,7 @@ SBStLivePreview >> selection: aBlock [
 	| target |
 	scheduler ifNotNil: [scheduler removeAlarm: #show for: self].
 	self owner ifNotNil: [self owner removeMorph: self].
+	errorDecorator ifNotNil: [:d | d detach].
 	
 	target := self blockForLookup: aBlock.
 	target ifNil: [^ self].
@@ -130,10 +123,12 @@ SBStLivePreview >> selection: aBlock [
 { #category : #'as yet unclassified' }
 SBStLivePreview >> show [
 
-	| target show |
+	| target show hadError |
 	target := self blockForLookup: editor selection.
 	target ifNil: [^ self].
 	show := false.
+	hadError := false.
+	
 	self
 		valueForBlock: target
 		ifFound: [:result |
@@ -141,19 +136,26 @@ SBStLivePreview >> show [
 			self label contents: ([result printString]
 				on: Error
 				do: [:err | '<error ({1})>' format: {result className}]).
-			self icon changeIconName: #iconInfoCircle]
+			self icon changeIconName: #iconInfoCircle.
+			target containingArtefact ifNotNil: [:a | a cacheType: result class for: target]]
 		onTimeout: [
 			show := true.
 			self label contents: '<timeout>'.
 			self icon changeIconName: #iconClockO]
 		onError: [:err |
+			hadError := true.
 			show := true.
 			self label contents: (err printStringLimitedTo: 40).
 			self icon changeIconName: #iconBolt].
 	
-	target ensureLayouted.
-	self position: target bottomLeft.
-	editor openMorph: self
+	hadError ifTrue: [
+		" need to re-execute because the previous run was instrumented, so the PCs are off "
+		self
+			executeCurrentExampleIfFound: [:v | ]
+			onTimeout: []
+			onError: [:f | (SBSmallError findOpenContextFrom: f signalerContext in: editor) ifNotNil: [:b | b attachDecorator: (errorDecorator := SBErrorDecorator new subtle: true)]]].
+	
+	show ifTrue: [self showBelow: target]
 ]
 
 { #category : #'as yet unclassified' }
@@ -163,10 +165,16 @@ SBStLivePreview >> showDelay [
 ]
 
 { #category : #'as yet unclassified' }
-SBStLivePreview >> valueForBlock: aBlock ifFound: aClosure onTimeout: timeoutBlock onError: errorBlock [
+SBStLivePreview >> timeout [
 
-	| env |
-	env := (SBExecutionEnvironment getAllIn: editor) first.
+	^ 100 milliSeconds
+]
+
+{ #category : #'as yet unclassified' }
+SBStLivePreview >> valueForBlock: aBlock ifFound: foundBlock onTimeout: timeoutBlock onError: errorBlock [
+
+	aBlock containingArtefact exists ifFalse: [^ self].
+	
 	^ SBToggledCode comment: '' active: 1 do: {
 		[ | cmd currentMethod methodBlock selection newMethod |
 			methodBlock := aBlock containingArtefact veryDeepCopy.
@@ -187,11 +195,7 @@ SBStLivePreview >> valueForBlock: aBlock ifFound: aClosure onTimeout: timeoutBlo
 				currentMethod methodClass
 					addSelectorSilently: currentMethod selector
 					withMethod: newMethod.
-				[[env execute] valueWithin: 100 milliSeconds onTimeout: [timeoutBlock value]]
-					on: SBStRunUntilValue
-					do: [:val | aClosure value: val value]
-					on: Exception
-					do: [:ex | errorBlock value: ex]] ensure: [
+				self executeCurrentExampleIfFound: foundBlock onTimeout: timeoutBlock onError: errorBlock] ensure: [
 				currentMethod methodClass
 					addSelectorSilently: currentMethod selector
 					withMethod: currentMethod]].

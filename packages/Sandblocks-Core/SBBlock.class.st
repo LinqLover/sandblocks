@@ -73,15 +73,13 @@ SBBlock >> actionProviders [
 
 { #category : #'action helpers' }
 SBBlock >> actions [
-	
+
 	^ (Array streamContents: [:stream |
 		self actionProviders do: [:obj |
 			obj class withAllSuperclassesDo: [:class |
 				Pragma
 					withPragmasIn: class
-					do: [:pragma |
-						(#(#action #multiSelectAction #inputAction) includes: pragma keyword) ifTrue: [stream nextPut: pragma]]]]]) 
-		asIdentitySet asArray.
+					do: [:pragma | (#(#action #multiSelectAction #inputAction) includes: pragma keyword) ifTrue: [stream nextPut: pragma]]]]]) asIdentitySet asArray
 ]
 
 { #category : #hierarchy }
@@ -136,6 +134,13 @@ SBBlock >> allChildBlocksSatisfy: aBlock [
 
 	self allBlocksDo: [:b | (b ~= self and: [(aBlock value: b) not]) ifTrue: [^ false]].
 	^ true
+]
+
+{ #category : #hierarchy }
+SBBlock >> andAllParentSandblocksDo: aBlock [
+
+	aBlock value: self.
+	self parentSandblock ifNotNil: [:p | p andAllParentSandblocksDo: aBlock]
 ]
 
 { #category : #'as yet unclassified' }
@@ -321,6 +326,12 @@ SBBlock >> canCopy [
 	^ true
 ]
 
+{ #category : #'actions tests' }
+SBBlock >> canDelete [
+
+	^ (self parentSandblock deleteCommandFor: self) notNil
+]
+
 { #category : #'insert/delete' }
 SBBlock >> canDeleteChild: aBlock [
 
@@ -354,6 +365,18 @@ SBBlock >> canInput [
 	"(self class lookupSelector: #startInputAt:replacingContents:) methodClass ~= SBBlock"
 	
 	^ self currentTextMorph notNil
+]
+
+{ #category : #'actions tests' }
+SBBlock >> canInsertAfter [
+
+	^ (self parentSandblock insertEmptyCommandRequestNear: self before: false) notNil
+]
+
+{ #category : #'actions tests' }
+SBBlock >> canInsertBefore [
+
+	^ (self parentSandblock insertEmptyCommandRequestNear: self before: true) notNil
 ]
 
 { #category : #'actions tests' }
@@ -725,33 +748,11 @@ SBBlock >> deleteAfterCursor [
 SBBlock >> deleteAround [
 	<action>
 
-	| editor target |
-	SBExample self: ['3 squared' parseInMethod receiver] args: [{}] label: 'example'.
+	| editor |
+	self example: ['3 squared' parseInMethod receiver] args: [{}] label: 'example'.
 	editor := self sandblockEditor.
-	target := self parentSandblock.
-	
-	editor countModifier - 1 timesRepeat: [target := target parentSandblock ifNil: [^ self]].
-	
-	SBToggledCode comment: 'Special type of unwrap for dynamically sized parents' active: 0 do: {
-		[
-			(self parentSandblock childSandblocks size > 1 and: [target parentHasDynamicNumberOfChildren and: [self isStatement]]) ifTrue: [
-				self setProperty: #copyPlaceholder toValue: true.
-				SBToggledCode
-					comment: 'TODO: we still need to delete adjacent elements before copying'
-					active: 1
-					do: {[editor copyBuffer: target]}.
-				self removeProperty: #copyPlaceholder.
-				
-				editor do: (SBRecordedCommand new record: [:recorder |
-					recorder
-						moveAll: self parentSandblock childSandblocks
-						in: target owner
-						at: target submorphIndex + 1.
-					recorder remove: target]).
-				^ self]]}.
-	
-	[
-		self convertedFor: target objectInterface do: [:replacer |
+	self
+		deleteAroundTargetDo: [:target :replacer |
 			self setProperty: #copyPlaceholder toValue: true.
 			editor copyBuffer: target.
 			self removeProperty: #copyPlaceholder.
@@ -759,10 +760,19 @@ SBBlock >> deleteAround [
 				target: target;
 				replacer: replacer).
 			replacer postDuplicate.
-			^ self].
-		" if we did not find a valid conversion, try again with the parent "
+			^ self]
+		ifNone: []
+]
+
+{ #category : #'action helpers' }
+SBBlock >> deleteAroundTargetDo: aBlock ifNone: anotherBlock [
+
+	| target |
+	target := self parentSandblock.
+	[
+		self convertedFor: target objectInterface do: [:replacer | aBlock value: target value: replacer].
 		target := target parentSandblock.
-		(target isNil or: [target floating and: [target isArtefact]]) ifTrue: [^ self]] repeat
+		(target isNil or: [target floating and: [target isArtefact]]) ifTrue: [^ anotherBlock value]] repeat
 ]
 
 { #category : #actions }
@@ -788,20 +798,25 @@ SBBlock >> deleteBeforeCursor [
 				self hasChildSandblocks not
 					ifTrue: [self deleteBlock]
 					ifFalse: [(target = self childSandblocks first or: [target hasOwner: self childSandblocks first]) ifTrue: [self childSandblocks first deleteAround]]].
-			editor startInput: target at: 900000000 replacingContents: false]
+			target sandblockEditor ifNotNil: [editor startInput: target at: 900000000 replacingContents: false]]
 		ifFalse: [
 			(self parentHasDynamicNumberOfChildren and: [parent childSandblocks size > 1])
 				ifTrue: [
 					self deleteBlock.
 					editor startInput: parent childSandblocks first at: 900000000 replacingContents: false]
 				ifFalse: [
-					self deleteAround.
-					editor startInput: self at: 900000000 replacingContents: false]]
+					self
+						deleteAroundTargetDo: [:target :replacer |
+							target floating ifFalse: [
+								self deleteAround.
+								editor startInput: self at: 900000000 replacingContents: false]]
+						ifNone: []]]
 ]
 
 { #category : #actions }
 SBBlock >> deleteBlock [
 	<multiSelectAction>
+	<actionValidIf: #canDelete>
 
 	self isSelected ifFalse: [^ self sandblockEditor do: (self parentSandblock deleteCommandFor: self)].
 	
@@ -811,12 +826,13 @@ SBBlock >> deleteBlock [
 { #category : #actions }
 SBBlock >> deleteBlockWithCopy [
 	<multiSelectAction>
+	<actionValidIf: #canDelete>
 
 	| blocks editor |
 	blocks := self sandblockEditor multiSelection.
 	editor := self sandblockEditor.
 	self deleteBlock.
-	editor copyBuffer: blocks.
+	editor copyBuffer: blocks
 ]
 
 { #category : #'insert/delete' }
@@ -863,6 +879,12 @@ SBBlock >> dismiss [
 	<action>
 
 	self removeSuggestionMenu
+]
+
+{ #category : #'dropping/grabbing' }
+SBBlock >> dragTarget [
+
+	^ self veryDeepCopy
 ]
 
 { #category : #drawing }
@@ -1284,6 +1306,7 @@ SBBlock >> insertElement: aBeforeBoolean [
 SBBlock >> insertElementAfter [
 	<action>
 	<inputAction>
+	<actionValidIf: #canInsertAfter>
 
 	^ self insertElement: false
 ]
@@ -1292,6 +1315,7 @@ SBBlock >> insertElementAfter [
 SBBlock >> insertElementBefore [
 	<action>
 	<inputAction>
+	<actionValidIf: #canInsertBefore>
 
 	^ self insertElement: true
 ]
@@ -1630,8 +1654,9 @@ SBBlock >> localNestingDepth [
 SBBlock >> lookupAction: aSymbol [
 
 	self actionProviders do: [:provider |
-		((provider class lookupSelector: aSymbol) ifNotNil: [:m | self isValidAction: m] ifNil: [false]) ifTrue: [
-			^ provider]].
+		((provider class lookupSelector: aSymbol)
+			ifNotNil: [:m | self isValidAction: m]
+			ifNil: [false]) ifTrue: [^ provider]].
 	^ nil
 ]
 
@@ -1732,6 +1757,7 @@ SBBlock >> moveCursorToStart [
 { #category : #actions }
 SBBlock >> multiSelectChildren [
 	<action>
+	<actionValidIf: #hasChildSandblocks>
 
 	self sandblockEditor multiSelection: self childSandblocks
 ]
@@ -1884,6 +1910,13 @@ SBBlock >> ownerWithColor [
 	^ self
 ]
 
+{ #category : #accessing }
+SBBlock >> palettes [
+
+	" return SBPalette subclasses you'd like to have displayed here "
+	^ #()
+]
+
 { #category : #hierarchy }
 SBBlock >> parentAdjacentBlock: aNumber [
 
@@ -1954,7 +1987,7 @@ SBBlock >> pasteReplace [
 SBBlock >> performAction: aSymbol [
 
 	(self lookupAction: aSymbol) ifNotNil: [:obj |
-		obj ~= self ifTrue: [obj block: self].
+		(obj ~= self and: [obj respondsTo: #block:]) ifTrue: [obj block: self].
 		obj perform: aSymbol.
 		^ true].
 	^ false
@@ -1970,7 +2003,7 @@ SBBlock >> pickUp: anEvent [
 
 	| editor s |
 	self canDrag ifFalse: [^ self].
-
+	
 	editor := self sandblockEditor.
 	s := SBSelection new
 		homeArtefact: self containingArtefact;
@@ -1982,7 +2015,7 @@ SBBlock >> pickUp: anEvent [
 	
 	self containingBlock ifNotNil: [:b | (b sandblockBlockColorIfAbsent: [nil]) ifNotNil: [:c | s color: c]].
 	
-	s addMorphBack: self veryDeepCopy.
+	s addMorphBack: self dragTarget.
 	anEvent hand grabMorph: s.
 	
 	(anEvent shiftPressed not and: [self copyOnDrag not]) ifTrue: [
@@ -2674,14 +2707,15 @@ SBBlock >> updateSuggestions: aCollection showNear: aMorph [
 
 	(aCollection isEmpty or: [self hasInput not]) ifTrue: [^ self removeSuggestionMenu].
 	
+	self sandblockEditor ifNil: [^ self].
+	
 	self suggestionsMenu
 		editor: self sandblockEditor;
 		suggestions: (aCollection take: 30);
-		topLeft: aMorph positionInWorld + (0 @ aMorph height).
+		topLeft: aMorph position + (0 @ aMorph height).
 	
-	self world ifNotNil: [
-		self suggestionsMenu openInWorld.
-		self suggestionsMenu resize]
+	self sandblockEditor openMorph: self suggestionsMenu.
+	self suggestionsMenu resize
 ]
 
 { #category : #layout }

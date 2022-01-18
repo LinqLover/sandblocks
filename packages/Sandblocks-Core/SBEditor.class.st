@@ -907,7 +907,7 @@ SBEditor >> keyboardFocusColor [
 { #category : #accessing }
 SBEditor >> labelString [
 
-	^ 'Editor'
+	^ 'Sandblocks'
 ]
 
 { #category : #actions }
@@ -1160,6 +1160,12 @@ SBEditor >> outOfWorld: aWorld [
 	super outOfWorld: aWorld.
 	
 	helpOverlay ifNotNil: #delete
+]
+
+{ #category : #accessing }
+SBEditor >> palettes [
+
+	^ {SBCommonPalette}
 ]
 
 { #category : #hierarchy }

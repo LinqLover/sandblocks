@@ -27,9 +27,10 @@ SBComboBox >> chooseMorphs: aCollection [
 		filterEnabled: true;
 		autoCancel: true;
 		yourself.
-	"Like a pop-up menu, click anywhere to dismiss."
 	aCollection withIndexDo: [:ea :index | dialog createButton: ea value: index].
-	tooltips ifNotNil: [tooltips with: dialog buttons do: [:tooltip :button | button balloonText: tooltip]].
+	(tooltips ifNil: [aCollection collect: #balloonText])
+		with: dialog buttons
+		do: [:tooltip :button | button balloonText: tooltip].
 	dialog selectedButtonIndex: 1.
 	^ dialog getUserResponseAtHand
 ]
@@ -85,7 +86,8 @@ SBComboBox >> object: anObject [
 			ifNotNil: [
 				actualLabels := self labels ifNil: [self values].
 				self contents: (self display: (actualLabels at: (self values indexOf: anObject)))]
-			ifNil: [self contents: (self display: anObject) asString]]
+			ifNil: [self contents: (self display: anObject) asString]].
+	self triggerEvent: #selectionChanged with: anObject
 ]
 
 { #category : #'as yet unclassified' }

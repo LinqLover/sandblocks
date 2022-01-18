@@ -101,6 +101,7 @@ SBStMethod >> initialize [
 { #category : #'insert/delete' }
 SBStMethod >> insertCommandRequest: aMorph near: aBlock before: aBoolean [
 
+	((aBlock isNil and: [aBoolean not]) or: [aBlock = self body]) ifTrue: [^ nil].
 	^ self signature insertCommandRequest: aMorph near: aBlock before: aBoolean
 ]
 
@@ -271,6 +272,12 @@ SBStMethod >> storeOn: aStream [
 		nextPutAll: ' at: ';
 		nextPutAll: self position storeString;
 		nextPut: $)
+]
+
+{ #category : #'insert/delete' }
+SBStMethod >> tryDelete [
+
+	
 ]
 
 { #category : #suggestions }
