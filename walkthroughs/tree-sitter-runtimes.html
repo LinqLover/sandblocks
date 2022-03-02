@@ -3,7 +3,7 @@
     <head>
         <!-- Book generated using mdBook -->
         <meta charset="UTF-8">
-        <title>Custom Commands - Sandblocks</title>
+        <title>Tree Sitter Runtimes - Sandblocks</title>
         
         
 
@@ -95,7 +95,7 @@
 
         <nav id="sidebar" class="sidebar" aria-label="Table of contents">
             <div class="sidebar-scrollbox">
-                <ol class="chapter"><li class="chapter-item expanded "><a href="../sandblocks.html"><strong aria-hidden="true">1.</strong> Sandblocks</a></li><li class="chapter-item expanded "><a href="../faq.html"><strong aria-hidden="true">2.</strong> Frequently Asked Questions</a></li><li class="chapter-item expanded "><a href="../chapter_walkthroughs.html"><strong aria-hidden="true">3.</strong> Walkthroughs</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../walkthroughs/squeak.html"><strong aria-hidden="true">3.1.</strong> Setting up Squeak</a></li><li class="chapter-item expanded "><a href="../walkthroughs/git.html"><strong aria-hidden="true">3.2.</strong> Working with Git</a></li><li class="chapter-item expanded "><a href="../walkthroughs/palettes.html"><strong aria-hidden="true">3.3.</strong> Custom Palettes</a></li><li class="chapter-item expanded "><a href="../walkthroughs/blocks.html"><strong aria-hidden="true">3.4.</strong> Custom Blocks</a></li><li class="chapter-item expanded "><a href="../walkthroughs/projections.html"><strong aria-hidden="true">3.5.</strong> Custom Projections</a></li><li class="chapter-item expanded "><a href="../walkthroughs/commands.html" class="active"><strong aria-hidden="true">3.6.</strong> Custom Commands</a></li><li class="chapter-item expanded "><a href="../walkthroughs/lists-of-blocks.html"><strong aria-hidden="true">3.7.</strong> Lists of Blocks</a></li><li class="chapter-item expanded "><a href="../walkthroughs/drag-and-drop.html"><strong aria-hidden="true">3.8.</strong> Drag and Drop</a></li><li class="chapter-item expanded "><a href="../walkthroughs/artefacts.html"><strong aria-hidden="true">3.9.</strong> Saving and Artefacts</a></li><li class="chapter-item expanded "><a href="../walkthroughs/shortcuts.html"><strong aria-hidden="true">3.10.</strong> Custom Shortcuts</a></li><li class="chapter-item expanded "><a href="../walkthroughs/tree-sitter.html"><strong aria-hidden="true">3.11.</strong> Tree Sitter</a></li><li class="chapter-item expanded "><a href="../walkthroughs/tree-sitter-runtimes.html"><strong aria-hidden="true">3.12.</strong> Tree Sitter Runtimes</a></li></ol></li></ol>
+                <ol class="chapter"><li class="chapter-item expanded "><a href="../sandblocks.html"><strong aria-hidden="true">1.</strong> Sandblocks</a></li><li class="chapter-item expanded "><a href="../faq.html"><strong aria-hidden="true">2.</strong> Frequently Asked Questions</a></li><li class="chapter-item expanded "><a href="../chapter_walkthroughs.html"><strong aria-hidden="true">3.</strong> Walkthroughs</a></li><li><ol class="section"><li class="chapter-item expanded "><a href="../walkthroughs/squeak.html"><strong aria-hidden="true">3.1.</strong> Setting up Squeak</a></li><li class="chapter-item expanded "><a href="../walkthroughs/git.html"><strong aria-hidden="true">3.2.</strong> Working with Git</a></li><li class="chapter-item expanded "><a href="../walkthroughs/palettes.html"><strong aria-hidden="true">3.3.</strong> Custom Palettes</a></li><li class="chapter-item expanded "><a href="../walkthroughs/blocks.html"><strong aria-hidden="true">3.4.</strong> Custom Blocks</a></li><li class="chapter-item expanded "><a href="../walkthroughs/projections.html"><strong aria-hidden="true">3.5.</strong> Custom Projections</a></li><li class="chapter-item expanded "><a href="../walkthroughs/commands.html"><strong aria-hidden="true">3.6.</strong> Custom Commands</a></li><li class="chapter-item expanded "><a href="../walkthroughs/lists-of-blocks.html"><strong aria-hidden="true">3.7.</strong> Lists of Blocks</a></li><li class="chapter-item expanded "><a href="../walkthroughs/drag-and-drop.html"><strong aria-hidden="true">3.8.</strong> Drag and Drop</a></li><li class="chapter-item expanded "><a href="../walkthroughs/artefacts.html"><strong aria-hidden="true">3.9.</strong> Saving and Artefacts</a></li><li class="chapter-item expanded "><a href="../walkthroughs/shortcuts.html"><strong aria-hidden="true">3.10.</strong> Custom Shortcuts</a></li><li class="chapter-item expanded "><a href="../walkthroughs/tree-sitter.html"><strong aria-hidden="true">3.11.</strong> Tree Sitter</a></li><li class="chapter-item expanded "><a href="../walkthroughs/tree-sitter-runtimes.html" class="active"><strong aria-hidden="true">3.12.</strong> Tree Sitter Runtimes</a></li></ol></li></ol>
             </div>
             <div id="sidebar-resize-handle" class="sidebar-resize-handle"></div>
         </nav>
@@ -163,66 +163,87 @@
 
                 <div id="content" class="content">
                     <main>
-                        <h1 id="custom-commands"><a class="header" href="#custom-commands">Custom Commands</a></h1>
-<p>To allow for undo and change tracking, all mutations to state in Sandblocks must be performed through commands.
-Commands are subclasses of <code>SBCommand</code> that describe the change in the system:</p>
-<pre><code>SBReplaceCommand new
-    target: ...;
-    replacer: ...;
-    yourself
+                        <h1 id="sandblockstreesitter-runtimes"><a class="header" href="#sandblockstreesitter-runtimes">Sandblocks/TreeSitter Runtimes</a></h1>
+<p>The runtimes system as part of Sandblocks-TreeSitter allows you to execute code from supported languages.
+It comes with support for monitoring its stdout/stderr and injecting watches that report back to the Sandblocks IDE.</p>
+<h2 id="opening-and-running-a-file"><a class="header" href="#opening-and-running-a-file">Opening and Running a File</a></h2>
+<p>In a Sandblocks workspace, run:</p>
+<pre><code>(SBTSFile filepath: '/home/you/test.py') open
 </code></pre>
-<p>To perform a command, call <code>do:</code> on the SBEditor:</p>
-<pre><code>self sandblockEditor do: (SBReplaceCommand new
-    target: ...;
-    replacer: ...;
-    yourself)
+<p>At the top of the file will be a Play button. Once clicked, it will try to find a python interpreter on your system and execute the given file.</p>
+<p><img src="../assets/python-file.png" alt="" /></p>
+<h2 id="evaluating-foreign-code"><a class="header" href="#evaluating-foreign-code">Evaluating Foreign Code</a></h2>
+<p>If you want to evaluate a snippet of code, use e.g.</p>
+<pre><code>SBPython instance runtime evaluate: 'print(&quot;Hello!&quot;)'
 </code></pre>
-<p>Commands will ensure that the next artefact in the block tree will be marked as having unsaved changes after a command is applied.</p>
-<h2 id="combining-commands"><a class="header" href="#combining-commands">Combining Commands</a></h2>
-<p>Often, you will want to perform multiple things at once but they should be undo-able with a single click.
-For this purpose, you may use the <code>SBCombinedCommand</code>:</p>
-<pre><code>SBCombinedCommand newWith: (targets collect: [:target |
-    SBDeleteCommand new target: target])
+<p>The return value will be the stdout of the program snippet.</p>
+<p>To receive stderr or to execute code asynchronously, check if your runtime implements <code>#evaluateFileAsync:cancel:</code>. Refer to its senders for examples on how to use the corresponding API.</p>
+<h2 id="watches"><a class="header" href="#watches">Watches</a></h2>
+<p>You can insert a watch on any block moment but most likely inserting it on anything but an expression will result in a syntax error upon serialization or execution.
+Insert a watch by either right-clicking the expression and filtering for <code>wrapWithWatch</code> or by pressing the Cmd+Shift+W shortcut.</p>
+<h2 id="offscreen-watches"><a class="header" href="#offscreen-watches">Offscreen Watches</a></h2>
+<p>By placing watches offscreen, you can use them to report values from the runtime back to your TreeSitter replacement blocks.</p>
+<p>For example, we could make all Javascript <code>console.log</code> calls log to the Squeak Transcript as well by creating a replacement for <code>console.log</code> and serializing the expression with the watch's source code wrapped around it (see also <code>SBConsoleLogReporter</code> class that comes with Sandblocks):</p>
+<pre><code class="language-smalltalk">SBConsoleLogReporter&gt;&gt;initialize
+    
+    super initialize.
+    &quot; create a new empty watch and connect its reportedValue signal to our
+      newValue: method &quot;
+    watch := SBTSWatch newEmpty when: #reportedValue send: #newValue: to: self
+
+SBConsoleLogReporter&gt;&gt;writeSourceOn: aStream
+
+    &quot; update the watch's expression to the expression our replacement is wrapping &quot;
+	watch expression: self expression.
+	
+	aStream nextPutAll: 'console.log('.
+	watch writeSourceOn: aStream.
+	aStream nextPutAll: ')'
+
+SBConsoleLogReporter&gt;&gt;newValue: aString
+
+    &quot; apparently our watch triggered a reportedValue signal, so we're called &quot;
+    Transcript showln: aString
 </code></pre>
-<h2 id="some-built-in-commands"><a class="header" href="#some-built-in-commands">Some Built-in Commands</a></h2>
-<p>Here is a quick overview of some built-in commands. Use Ctrl+Shift+N in the Squeak image to see how each is used.</p>
-<table><thead><tr><th>Command</th><th>Effect</th></tr></thead><tbody>
-<tr><td>SBMutateProperty</td><td>Change the field of an object, such the checked state of a checkbox</td></tr>
-<tr><td>SBDeleteCommand</td><td>Delete a block</td></tr>
-<tr><td>SBInsertCommand</td><td>Insert a block at a given index</td></tr>
-<tr><td>SBReplaceCommand</td><td>Replace a block with another</td></tr>
-</tbody></table>
-<h2 id="custom-commands-1"><a class="header" href="#custom-commands-1">Custom Commands</a></h2>
-<p>If you need to perform a more complicated side effect, often a custom command will be the easiest way to perform it.
-Custom commands are simple to implement: subclass <code>SBCommand</code> and implement <code>do</code> and <code>undo</code>.
-You can consider subclassing from a more specific command, such as the <code>SBDeleteCommand</code> if both a block should disappear and something else should happen in the system.</p>
-<p>For a more lightweight alternative, you can also use the general purpose <code>SBDoItCommand</code> and combine it with another command, e.g.:</p>
-<pre><code>SBCombinedCommand newWith: {
-    SBDoItCommand new
-        do: [Transcript showln: 'deleted block'];
-        undo: [Transcript showln: 'restored block'. self];
-        yourself.
-    SBDeleteCommand new
-        target: self;
-        yourself
-}
+<p>You can also use this with custom code to extract specific values from the runtime:</p>
+<pre><code class="language-smalltalk">SBRequestReplacement&gt;&gt;initialize
+
+    watch := SBTSWatch newEmpty when: #reportedValue send: #newRequest: to: self
+
+SBRequestReplacement&gt;&gt;writeSourceOn: aStream
+
+    &quot; we are inserting this object literal in the code that expects a `req` variable
+      to be in the local scope and reporting the object back to squeak &quot;
+    watch expression: (SBJavascript parseElement:
+        '{path: req.path, headers: req.headers.map(h =&gt; [h.key, h.value])}').
+
+    &quot; ...our other serialization code, then our watch at a place where it's
+      syntactically valid &quot;
+    watch writeSourceOn: aStream.
+    &quot; ...more serialization code &quot;
+
+SBRequestReplacement&gt;&gt;newRequest: aString
+
+   &quot; we get the data as a string, which we can then decode &quot;
+   data := Json readFrom: aString.
+   Transcript showln: data headers
 </code></pre>
-<p>But generally, a custom subclass is a preferred, as it allows inspecting the data inside the command more easily.</p>
+<h2 id="pretty-printing"><a class="header" href="#pretty-printing">Pretty-Printing</a></h2>
+<p>Runtimes may support pretty printing code. If they do, whenever code is serialized to text (e.g., when copying or writing to a file), the <code>#prettySourceString</code> is called on the block, which passes the regular <code>#sourceString</code> of the block to the external pretty printer.</p>
+<h2 id="javascript-web-runtime"><a class="header" href="#javascript-web-runtime">Javascript Web Runtime</a></h2>
+<p>The Javascript web runtime is special in that it does not actually invoke any programs.
+Instead, it will only spawn a server that listens for watches to trigger.</p>
 
                     </main>
 
                     <nav class="nav-wrapper" aria-label="Page navigation">
                         <!-- Mobile navigation buttons -->
                         
-                            <a rel="prev" href="../walkthroughs/projections.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                            <a rel="prev" href="../walkthroughs/tree-sitter.html" class="mobile-nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                                 <i class="fa fa-angle-left"></i>
                             </a>
                         
 
-                        
-                            <a rel="next" href="../walkthroughs/lists-of-blocks.html" class="mobile-nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                                <i class="fa fa-angle-right"></i>
-                            </a>
                         
 
                         <div style="clear: both"></div>
@@ -232,15 +253,11 @@ You can consider subclassing from a more specific command, such as the <code>SBD
 
             <nav class="nav-wide-wrapper" aria-label="Page navigation">
                 
-                    <a rel="prev" href="../walkthroughs/projections.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
+                    <a rel="prev" href="../walkthroughs/tree-sitter.html" class="nav-chapters previous" title="Previous chapter" aria-label="Previous chapter" aria-keyshortcuts="Left">
                         <i class="fa fa-angle-left"></i>
                     </a>
                 
 
-                
-                    <a rel="next" href="../walkthroughs/lists-of-blocks.html" class="nav-chapters next" title="Next chapter" aria-label="Next chapter" aria-keyshortcuts="Right">
-                        <i class="fa fa-angle-right"></i>
-                    </a>
                 
             </nav>
 
