@@ -22,7 +22,9 @@ Class {
 		'cursor',
 		'hoverHighlight',
 		'suggestAlways',
-		'activePlugins'
+		'activePlugins',
+		'suggestionMenu',
+		'examples'
 	],
 	#classVars : [
 		'ActivatedPluginClasses',
@@ -270,34 +272,38 @@ SBEditor >> buildCommandBar [
 			icon: SBIcon iconColumns shortcut: nil do: [self togglePalette];
 			balloonText: 'Toggle Block Palette');
 		addMorphBack: (SBButton new
-			icon: SBIcon iconUndo
-			shortcut: (self class anyShortcutForAction: #undo)
-			do: [self undo]);
+			icon: SBIcon iconUndo shortcut: (self class anyShortcutForAction: #undo) do: [self undo];
+			balloonText: 'Undo');
 		addMorphBack: (SBButton new
-			icon: SBIcon iconRepeat
-			shortcut: (self class anyShortcutForAction: #redo)
-			do: [self redo]);
+			icon: SBIcon iconRepeat shortcut: (self class anyShortcutForAction: #redo) do: [self redo];
+			balloonText: 'Redo');
 		addMorphBack: (SBButton new
 			icon: SBIcon iconFolderOpen
-			shortcut: (self class anyShortcutForAction: #openOpenWindow)
-			do: [self openOpenWindow]);
+				shortcut: (self class anyShortcutForAction: #openOpenWindow)
+				do: [self openOpenWindow];
+			balloonText: 'Open method...');
 		addMorphBack: (SBButton new
 			icon: SBIcon iconPlus
 				shortcut: (self class anyShortcutForAction: #promptAddArtifact)
 				do: [self promptAddArtifact];
-			balloonText: 'Add artifact');
+			balloonText: 'Add artifact...');
+		addMorphBack: (SBButton new
+			icon: SBIcon iconTerminal
+				shortcut: (self class anyShortcutForAction: #openRepl)
+				do: [self openRepl];
+			balloonText: 'Add artifact...');
 		addMorphBack: (Morph new
 			height: 0;
 			color: Color transparent;
 			hResizing: #spaceFill);
 		addMorphBack: (SBButton new
-			icon: SBIcon iconCog
-			shortcut: nil
-			do: [self openMorphInView: SBPreferencesEditor new]);
+			icon: SBIcon iconCog shortcut: nil do: [self openMorphInView: SBPreferencesEditor new];
+			balloonText: 'Open preferences');
 		addMorphBack: (SBButton new
 			icon: SBIcon iconExpand
-			shortcut: (self class anyShortcutForAction: #toggleFullscreen)
-			do: [self toggleFullscreen])
+				shortcut: (self class anyShortcutForAction: #toggleFullscreen)
+				do: [self toggleFullscreen];
+			balloonText: 'Toggle fullscreen')
 ]
 
 { #category : #ui }
@@ -410,7 +416,7 @@ SBEditor >> configurationString [
 SBEditor >> connectFrom: aMorph to: anotherMorph [
 
 	scroll scroller addMorph: ((SBConnectorLine new connectorType: #dots)
-		color: Color black;
+		color: ((Color r: 0.0 g: 0.0 b: 0.0) alpha: 0.3);
 		connect: aMorph to: anotherMorph;
 		yourself)
 ]
@@ -434,7 +440,7 @@ SBEditor >> copyBuffer: aMorphOrCollection [
 		methodClass: (list first containingArtefact ifNotNil: #relatedClass);
 		colorPolicy: self colorPolicy.
 	
-	list do: [:m | copyBuffer addMorphBack: m veryDeepCopy].
+	list do: [:m | copyBuffer addMorphBack: m copyBlock].
 	Clipboard clipboardText: copyBuffer firstSubmorph textContentsForCopy.
 	form := copyBuffer imageForm.
 	copyBufferPreview ifNotNil: [copyBufferPreview image: (form scaledToFit: self copyBufferPreviewSize)]
@@ -448,7 +454,7 @@ SBEditor >> copyBufferForContext: anInterface reversed: aBoolean do: aBlock ifWr
 			copyBuffer wrapsAround
 				ifTrue: [aWrapBlock value: copyBuffer unpackSelection veryDeepCopy]
 				ifFalse: [ | list |
-					list := copyBuffer submorphs veryDeepCopy.
+					list := copyBuffer submorphs collect: #copyBlock.
 					aBoolean ifTrue: [list := list reversed].
 					list withIndexDo: [:morph :index |
 						morph
@@ -533,7 +539,7 @@ SBEditor >> createEmptySmalltalkMethod [
 		selector: ''
 			arguments: #()
 			class: ((self selectedArtefact ifNotNil: [:container | container relatedClass]) ifNil: [UIManager default chooseClassOrTrait ifNil: [^ self]]);
-		body: (SBStBlockBody new in: [:b | b statements: {b newNullBlock}]).
+		body: SBStBlockBody new.
 	
 	self createArtefactInView: method.
 	method inputContainedUnknown.
@@ -587,7 +593,7 @@ SBEditor >> deleteCommandFor: aBlock [
 SBEditor >> do: aCommand [
 
 	cursor prepareForNextCommand.
-
+	
 	history do: aCommand previousSelection: self selection selectDo: [:block :artefacts |
 		self select: block.
 		self markChangesAfterCommand: artefacts]
@@ -662,6 +668,12 @@ SBEditor >> endMultiSelection [
 SBEditor >> errors [
 
 	^ errors
+]
+
+{ #category : #accessing }
+SBEditor >> examples [
+
+	^ examples
 ]
 
 { #category : #events }
@@ -804,11 +816,13 @@ SBEditor >> initialize [
 	super initialize.
 	
 	history := SBHistoryStack new.
+	examples := SBExampleHub new editor: self.
 	colorPolicy := self class defaultColorPolicy new enlarge: SBPreferences largeInsets.
 	compileTime := #compileOnSave.
 	globalShortcutListeners := OrderedCollection new.
 	inputMapping := self class newInputMapping.
 	searchInput := SBSearchPanel new.
+	suggestionMenu := SBSuggestionMenu new.
 	cursor := SBBlockCursor new editor: self.
 	
 	paletteContainer := SBUpdatingPaletteContainer new
@@ -843,6 +857,7 @@ SBEditor >> initialize [
 	
 	self
 		registerGlobalShortcutListener: self;
+		registerGlobalShortcutListener: suggestionMenu;
 		registerGlobalShortcutListener: searchInput;
 		registerGlobalShortcutListener: cursor;
 		resetState;
@@ -914,8 +929,14 @@ SBEditor >> labelString [
 SBEditor >> loadBlocks [
 	<globalAction>
 
-	scroll scroller submorphs copy do: [:each | each abandon].
+	scroll scroller submorphs reject: [:each | each survivesReload ] thenDo: [:each | each abandon].
 	self class loadSaveInto: self
+]
+
+{ #category : #'as yet unclassified' }
+SBEditor >> markChanged: anArtefact [
+
+	^ history markChanged: {anArtefact} redraw: true
 ]
 
 { #category : #'do/undo/redo' }
@@ -965,6 +986,13 @@ SBEditor >> morphicLayerNumber [
 	^ 77 - 1
 ]
 
+{ #category : #'as yet unclassified' }
+SBEditor >> mouseEnter: event [
+
+	super mouseEnter: event.
+	Preferences mouseOverForKeyboardFocus ifTrue: [event hand newKeyboardFocus: self]
+]
+
 { #category : #'event handling' }
 SBEditor >> mouseLeave: anEvent [
 
@@ -1004,6 +1032,14 @@ SBEditor >> multiSelectionIsConsecutive [
 	sorted overlappingPairsDo: [:a :b |
 		a submorphAfter = b ifFalse: [^ false]].
 	^ true
+]
+
+{ #category : #accessing }
+SBEditor >> newSelectionContainer [
+
+	^ SBSelection new
+		colorPolicy: self colorPolicy;
+		yourself
 ]
 
 { #category : #'event handling' }
@@ -1319,6 +1355,12 @@ SBEditor >> reportErrorWithProcessCopy: anError source: anExecutableEnvironment 
 		source: anExecutableEnvironment
 ]
 
+{ #category : #accessing }
+SBEditor >> requestor [
+
+	^ Requestor default
+]
+
 { #category : #initialization }
 SBEditor >> resetState [
 
@@ -1458,18 +1500,6 @@ SBEditor >> showHelper [
 	(helpOverlay isNil and: [self isInWorld and: [self selection notNil]]) ifTrue: [helpOverlay := SBHelpOverlay new target: self selection]
 ]
 
-{ #category : #suggestions }
-SBEditor >> showSuggestionsMenu: menu near: aMorph [
-	"Hook for subclasses."
-
-	menu
-		editor: self;
-		topLeft: aMorph position + (0 @ aMorph height).
-	
-	self openMorph: menu.
-	menu resize
-]
-
 { #category : #selection }
 SBEditor >> sortedMultiSelection [
 
@@ -1497,6 +1527,12 @@ SBEditor >> startInput: aMorph at: aNumber replacingContents: aBoolean [
 SBEditor >> startOrAddToMultiSelection: aBlock [
 
 	self cursor startOrAddToMultiSelection: aBlock
+]
+
+{ #category : #stepping }
+SBEditor >> stepTime [
+
+	^ 0
 ]
 
 { #category : #printing }
@@ -1537,6 +1573,14 @@ SBEditor >> suggestAlways [
 SBEditor >> suggestAlways: aBoolean [
 
 	suggestAlways := aBoolean
+]
+
+{ #category : #accessing }
+SBEditor >> suggestionMenu [
+
+	suggestionMenu ifNil: [suggestionMenu := SBSuggestionMenu new].
+	(globalShortcutListeners includes: suggestionMenu) ifFalse: [globalShortcutListeners addFirst: suggestionMenu].
+	^ suggestionMenu
 ]
 
 { #category : #actions }
@@ -1606,10 +1650,12 @@ SBEditor >> updateMouseCursorFor: anEvent [
 	event := anEvent transformedBy: (self childSandblocks first transformedFrom: self).
 	
 	self firstBlockAt: anEvent position do: [:block |
-		hoverHighlight ifNil: [hoverHighlight := SBHoverDecorator new].
-		block ~= hoverHighlight morph ifTrue: [
-			hoverHighlight morph ifNotNil: [:p | p detachDecorators: SBHoverDecorator].
-			(block decorators noneSatisfy: [:d | d isKindOf: SBHoverDecorator]) ifTrue: [block attachDecorator: hoverHighlight]]].
+		hoverHighlight ifNil: [hoverHighlight := SBHoverDecorator new position: anEvent position].
+		block ~= hoverHighlight morph
+			ifTrue: [
+				hoverHighlight morph ifNotNil: [:p | p detachDecorators: SBHoverDecorator].
+				(block decorators noneSatisfy: [:d | d isKindOf: SBHoverDecorator]) ifTrue: [block attachDecorator: hoverHighlight]]
+			ifFalse: [hoverHighlight position: event position]].
 	
 	self
 		blocksAt: anEvent position
@@ -1625,7 +1671,7 @@ SBEditor >> updateSandblocks [
 	(UIManager default confirm: 'Proceed to install the latest unstable version?') ifTrue: [
 		(Smalltalk at: #Metacello) new
 			baseline: 'Sandblocks';
-			repository: 'github://tom95/Sandblocks:master/packages';
+			repository: 'github://hpi-swa/Sandblocks:master/packages';
 			get; load: #tutorial]
 ]
 

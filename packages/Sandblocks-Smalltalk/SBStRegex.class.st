@@ -9,7 +9,13 @@ Class {
 	#category : #'Sandblocks-Smalltalk'
 }
 
-{ #category : #'as yet unclassified' }
+{ #category : #testing }
+SBStRegex class >> instanceSuggestion [
+
+	^ [self new regexString: '' examples: #()]
+]
+
+{ #category : #testing }
 SBStRegex class >> matches: aBlock [
 
 	(super matches: aBlock) ifFalse: [^ false].
@@ -18,7 +24,7 @@ SBStRegex class >> matches: aBlock [
 	[(aBlock receiver satisfies: #(notNil isBinding)) and: [aBlock receiver contents = self name] and: [aBlock selector = 'regex:examples:']]
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : #'instance creation' }
 SBStRegex class >> newFor: aBubble [
 
 	^ aBubble selector = 'asRegex'
@@ -30,7 +36,7 @@ SBStRegex class >> newFor: aBubble [
 				examples: (aBubble arguments second childSandblocks collect: #contents)]
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : #'instance creation' }
 SBStRegex class >> regex: aRegex examples: aCollection [
 
 	^ aRegex asRegex
@@ -39,10 +45,7 @@ SBStRegex class >> regex: aRegex examples: aCollection [
 { #category : #'as yet unclassified' }
 SBStRegex >> addExample: aString [
 
-	examples
-		addMorph: (self createExample: aString)
-		asElementNumber: (examples submorphCount max: 1).
-	self updateLabel
+	examples addMorphBack: (self createExample: aString)
 ]
 
 { #category : #'as yet unclassified' }
@@ -82,9 +85,9 @@ SBStRegex >> createExample: aString [
 ]
 
 { #category : #'as yet unclassified' }
-SBStRegex >> currentTextMorph [
+SBStRegex >> fixedNumberOfChildren [
 
-	^ text
+	^ false
 ]
 
 { #category : #'as yet unclassified' }
@@ -101,17 +104,22 @@ SBStRegex >> initialize [
 	self
 		layoutInset: 2;
 		changeTableLayout;
+		cellGap: 4;
 		vResizing: #shrinkWrap;
 		hResizing: #shrinkWrap;
 		listDirection: #leftToRight;
 		cellPositioning: #center;
 		addMorphBack: (text := SBTextBubble new when: #contentsChanged send: #checkExamples to: self);
-		addMorphBack: ((exampleLabel := SBStringMorph new)
-			on: #click
-			send: #toggleExamples
-			to: self);
-		addMorphBack: ((examples := SBColumn new) when: #morphAdded send: #checkExamples to: self);
-		updateLabel
+		addMorphBack: (exampleLabel := SBStringMorph new contents: 'Examples:');
+		addMorphBack: ((examples := SBColumn new) when: #morphAdded send: #checkExamples to: self)
+]
+
+{ #category : #'as yet unclassified' }
+SBStRegex >> insertCommandRequest: aMorph near: aBlock before: aBoolean [
+
+	^ SBRelInsertCommand new
+		near: aBlock before: aBoolean in: examples morph: aMorph;
+		yourself
 ]
 
 { #category : #'as yet unclassified' }
@@ -148,33 +156,9 @@ SBStRegex >> regexString: aString examples: aCollection [
 ]
 
 { #category : #'as yet unclassified' }
-SBStRegex >> stopEditing: aCommand [
-
-	aCommand
-		newText: self contents;
-		newMorph: self.
-	
-	text stopEditing: aCommand
-]
-
-{ #category : #'as yet unclassified' }
 SBStRegex >> symbols [
 
 	^ self colorPolicy symbolsForRegex: self
-]
-
-{ #category : #'as yet unclassified' }
-SBStRegex >> toggleExamples [
-
-	examples owner
-		ifNotNil: [examples delete]
-		ifNil: [self addMorphBack: examples]
-]
-
-{ #category : #'as yet unclassified' }
-SBStRegex >> updateLabel [
-
-	exampleLabel contents: ' -- Examples: '
 ]
 
 { #category : #'as yet unclassified' }

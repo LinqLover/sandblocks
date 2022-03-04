@@ -6,6 +6,7 @@ Morph >> adjacentBlock: aNumber [
 	| adjacent index |
 	adjacent := (self parentSandblock ifNil: [^ nil]) childSandblocks.
 	index := adjacent indexOf: self.
+	index = 0 ifTrue: [^ nil].
 	^ adjacent at: index + aNumber ifAbsent: [nil]
 ]
 
@@ -94,6 +95,12 @@ Morph >> childSandblocksDo: aBlock [
 ]
 
 { #category : #'*Sandblocks-Core' }
+Morph >> clearCache [
+
+	self submorphsDo: [:m | m clearCache]
+]
+
+{ #category : #'*Sandblocks-Core' }
 Morph >> containingSandblock [
 
 	^ self owner ifNotNil: [:o | o containingSandblock]
@@ -101,6 +108,12 @@ Morph >> containingSandblock [
 
 { #category : #'*Sandblocks-Core' }
 Morph >> cursorPositionsDo: aBlock [
+
+	self cursorPositionsDo: aBlock shallow: false
+]
+
+{ #category : #'*Sandblocks-Core' }
+Morph >> cursorPositionsDo: aBlock shallow: aBoolean [
 	" enumerate all possible cursor positions recursively "
 
 	self isSandblock ifTrue: [
@@ -113,7 +126,7 @@ Morph >> cursorPositionsDo: aBlock [
 				aBlock value: (SBCursorText new
 					block: morph containingSandblock;
 					currentCommand: command)]].
-		morph cursorPositionsDo: aBlock.
+		(morph isSandblock not or: [aBoolean not]) ifTrue: [morph cursorPositionsDo: aBlock shallow: aBoolean].
 		morph isSandblock ifTrue: [self containingSandblock insertCursorNear: morph before: false do: aBlock]].
 	self isSandblock ifTrue: [self insertCursorNear: nil before: false do: aBlock]
 ]
@@ -162,6 +175,17 @@ Morph >> focusPreviousMorph: anEvent [
 Morph >> fontToUse [
 
 	^ TextStyle defaultFont
+]
+
+{ #category : #'*Sandblocks-Core' }
+Morph >> hasHorizontalLayout [
+
+	| blocks |
+	self isBlockBody ifTrue: [^ false].
+	blocks := self childSandblocks.
+	^ blocks size < 2 or: [ | delta |
+		delta := blocks first topLeft - blocks last topLeft.
+		delta x < delta y]
 ]
 
 { #category : #'*Sandblocks-Core' }

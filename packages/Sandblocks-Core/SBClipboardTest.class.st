@@ -25,7 +25,7 @@ SBClipboardTest >> tearDown [
 SBClipboardTest >> testCopyPasteBlock [
 
 	| block from to |
-	block := '[5. 6]' parseAsSandblock.
+	block := self parse: '[5. 6]'.
 	self methodFor: block.
 	from := block statements first.
 	to := block statements second.
@@ -41,7 +41,7 @@ SBClipboardTest >> testCopyPasteBlock [
 SBClipboardTest >> testCopyString [
 
 	| block from |
-	block := '[5 squared]' parseAsSandblock.
+	block := self parse: '[5 squared]'.
 	self methodFor: block.
 	from := block statements first.
 	
@@ -55,7 +55,7 @@ SBClipboardTest >> testCopyString [
 SBClipboardTest >> testPasteAfter [
 
 	| block selection editor |
-	block := '[a. b. c. self selected: 5]' parseAsSandblock.
+	block := self parse: '[a. b. c. self selected: 5]'.
 	selection := block statements last.
 	editor := self methodFor: block.
 	block statements first select.
@@ -71,14 +71,18 @@ SBClipboardTest >> testPasteAfter [
 SBClipboardTest >> testPasteMultiple [
 
 	| block selection editor |
-	block := '[a. b. c. self selected: 5]' parseAsSandblock.
+	block := self parse: '[a. b. c. self selected: 5]'.
 	selection := block statements last.
 	editor := self methodFor: block.
 	block statements first select.
 	(block statements viewFrom: 1 to: 3) do: #startOrAddToMultiSelection.
 	block statements first copyToBuffer.
-	selection select.
+	selection lastDeepChild select.
 	editor performForSelection: #moveCursorRight.
+	editor performForSelection: #moveCursorRight.
+	editor performForSelection: #moveCursorRight.
+	self assert: 'insert statement' equals: editor cursor cursorPosition command title.
+	self assert: block equals: editor cursor cursorPosition command container.
 	selection pasteReplace.
 	self assert: 'a' equals: block statements fifth contents.
 	self assert: 'b' equals: block statements sixth contents.
@@ -89,7 +93,7 @@ SBClipboardTest >> testPasteMultiple [
 SBClipboardTest >> testPasteString [
 
 	| block from |
-	block := '[5]' parseAsSandblock.
+	block := self parse: '[5]'.
 	self methodFor: block.
 	from := block statements first.
 	
@@ -102,7 +106,7 @@ SBClipboardTest >> testPasteString [
 SBClipboardTest >> testPasteStringAfterCopyBlock [
 
 	| block from to |
-	block := '[5. 6]' parseAsSandblock.
+	block := self parse: '[5. 6]'.
 	self methodFor: block.
 	from := block statements first.
 	to := block statements second.

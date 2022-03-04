@@ -79,6 +79,13 @@ SBCommand >> artefactFrom: aMorph [
 ]
 
 { #category : #testing }
+SBCommand >> canInsert: aBlock do: aClosure [
+	"return true if this an insert command for which aBlock would have been a valid insertion and return the morph or an adapted block via the closure"
+
+	^ false
+]
+
+{ #category : #testing }
 SBCommand >> continueAfterInsert: aCharacter [
 	" mark that if this command has been used as an insertion point, the input should be forward to the new block "
 
@@ -89,6 +96,13 @@ SBCommand >> continueAfterInsert: aCharacter [
 SBCommand >> do [
 
 	^ self subclassResponsibility
+]
+
+{ #category : #testing }
+SBCommand >> hasHorizontalLayout [
+	"used by insert commands to communicate the layout direction"
+
+	^ self container hasHorizontalLayout
 ]
 
 { #category : #'initialize-release' }
@@ -137,6 +151,13 @@ SBCommand >> previousSelection: aBlock [
 	previousSelection := aBlock
 ]
 
+{ #category : #testing }
+SBCommand >> secondaryInsertPosition [
+	"if this is an insert command, you can return true here to tell the cursor that this position should not receive default focus, even if it comes first in the container"
+
+	^ false
+]
+
 { #category : #apply }
 SBCommand >> selectAfter [
 
@@ -167,6 +188,13 @@ SBCommand >> shouldMergeWithNext [
 SBCommand >> shouldMergeWithNext: aBoolean [
 
 	shouldMergeWithNext := aBoolean
+]
+
+{ #category : #accessing }
+SBCommand >> suggestions [
+	"used by insert commands, return a list of suggestion items here"
+
+	^ #()
 ]
 
 { #category : #accessing }

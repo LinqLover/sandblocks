@@ -135,6 +135,12 @@ SBUnknown >> keyStroke: anEvent [
 ]
 
 { #category : #accessing }
+SBUnknown >> label [
+
+	^ self currentTextMorph placeholderText
+]
+
+{ #category : #accessing }
 SBUnknown >> label: aString [
 
 	self currentTextMorph placeholderText: aString
@@ -165,7 +171,7 @@ SBUnknown >> lookupAction: aSymbol [
 { #category : #accessing }
 SBUnknown >> newNullBlock [
 
-	^ self veryDeepCopy
+	^ self class new grammarHandler: self grammarHandler
 ]
 
 { #category : #'as yet unclassified' }
@@ -174,6 +180,18 @@ SBUnknown >> noteNewOwner: aMorph [
 
 	hadOwner == true ifTrue: [self label: ''].
 	hadOwner := true
+]
+
+{ #category : #accessing }
+SBUnknown >> placeholderText [
+
+	^ self label
+]
+
+{ #category : #accessing }
+SBUnknown >> placeholderText: aString [
+
+	self label: aString
 ]
 
 { #category : #'as yet unclassified' }
@@ -213,23 +231,6 @@ SBUnknown >> startInputAt: aNumber replacingContents: aBoolean [
 	^ cmd
 ]
 
-{ #category : #'text input' }
-SBUnknown >> stopEditing [
-
-	self currentTextMorph stopEditing.
-	self removeSuggestionMenu
-]
-
-{ #category : #'text input' }
-SBUnknown >> stopEditing: aCommand [
-
-	aCommand
-		newText: self currentTextMorph contents;
-		newMorph: self.
-	
-	self stopEditing
-]
-
 { #category : #accessing }
 SBUnknown >> symbols [
 
@@ -261,7 +262,9 @@ SBUnknown >> wasDeselected [
 		
 		(previousSelection notNil and: [previousSelection sandblockEditor notNil]) ifTrue: [
 			previousSelection select.
-			wasInput ifTrue: [editor startInput: previousSelection at: 900000000 replacingContents: false]]]
+			wasInput ifTrue: [editor startInput: previousSelection at: 900000000 replacingContents: false]]].
+	
+	super wasDeselected
 ]
 
 { #category : #printing }

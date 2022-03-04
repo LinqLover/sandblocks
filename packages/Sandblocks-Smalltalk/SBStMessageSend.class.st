@@ -15,6 +15,22 @@ SBStMessageSend >> actualReceiver [
 ]
 
 { #category : #'as yet unclassified' }
+SBStMessageSend >> argumentChoicesFor: aBlock [
+
+	| index |
+	index := self arguments indexOf: aBlock.
+	index < 1 ifTrue: [^ #()].
+	
+	^ (signature likelyImplementorOf: self selector)
+		ifNotNil: [:method |
+			method pragmas
+				detect: [:pragma | pragma keyword = #argument:choices: and: [pragma arguments first = index]]
+				ifFound: [:pragma | ^ pragma arguments second]
+				ifNone: [#()]]
+		ifNil: [#()]
+]
+
+{ #category : #'as yet unclassified' }
 SBStMessageSend >> arguments [
 
 	^ signature arguments
@@ -85,6 +101,12 @@ SBStMessageSend >> balloonText [
 	^ super balloonText
 ]
 
+{ #category : #accessing }
+SBStMessageSend >> binding [
+
+	^ self isAssignment ifTrue: [self receiver] ifFalse: [self error: 'not an assignment']
+]
+
 { #category : #assignment }
 SBStMessageSend >> binding: aBlock value: anotherBlock [
 	" construct this send as an assignment "
@@ -92,7 +114,7 @@ SBStMessageSend >> binding: aBlock value: anotherBlock [
 	self receiver: aBlock selector: ':=' arguments: {anotherBlock}
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : #actions }
 SBStMessageSend >> browse [
 
 	self browseImplementors
@@ -281,28 +303,6 @@ SBStMessageSend >> isSendToSelf [
 SBStMessageSend >> isUnary [
 
 	^ self signature isUnary
-]
-
-{ #category : #'as yet unclassified' }
-SBStMessageSend >> keyStroke: anEvent [
-
-	(anEvent keyCharacter = Character space or: [(self selector notEmpty and: [self isBinary not]) and: [anEvent keyCharacter isSpecial]]) ifTrue: [
-		self sandblockEditor endInput.
-		^ self grammarHandler wrapInMessageSend: (anEvent keyCharacter isSpecial
-			ifTrue: [anEvent keyCharacter asString]
-			ifFalse: [''])].
-	
-	(anEvent keyCharacter = Character backspace and: [self selector isEmpty]) ifTrue: [ | receiver |
-		receiver := self receiver.
-		^ self sandblockEditor
-			endInput;
-			do: (SBReplaceCommand new
-				target: self;
-				replacer: receiver);
-			startInput: receiver at: 900000000 replacingContents: false].
-	
-	signature keyStroke: anEvent.
-	self updateSuggestions
 ]
 
 { #category : #'as yet unclassified' }
@@ -524,13 +524,6 @@ SBStMessageSend >> startInputAt: aNumber replacingContents: aBoolean [
 ]
 
 { #category : #'as yet unclassified' }
-SBStMessageSend >> stopEditing: aCommand [
-
-	signature stopEditing: aCommand.
-	self removeSuggestionMenu
-]
-
-{ #category : #'as yet unclassified' }
 SBStMessageSend >> symbols [
 
 	^ self colorPolicy symbolsForMessageSend: self
@@ -554,15 +547,6 @@ SBStMessageSend >> tryDelete [
 	editor selection startInputAtEnd
 ]
 
-{ #category : #'as yet unclassified' }
-SBStMessageSend >> updateSuggestions [
-
-	| selector |
-	self flag: #fixme. " we assume that the user is typing in the first cell and may want to override an existing message "
-	selector := (signature selector splitBy: ':') first.
-	self updateSuggestions: ((self actualReceiver completionSuggestionsFor: selector) collect: [:sel | SBSuggestionItem selector: sel label: 'send']) showNear: signature
-]
-
 { #category : #accessing }
 SBStMessageSend >> useAsVariable [
 	<action>
@@ -574,9 +558,9 @@ SBStMessageSend >> useAsVariable [
 ]
 
 { #category : #'as yet unclassified' }
-SBStMessageSend >> useSuggestion: aString [
+SBStMessageSend >> useSuggestion: anItem [
 
-	signature selectorAndEdit: aString withFilledArgs: false
+	signature selectorAndEdit: anItem contents withFilledArgs: false
 ]
 
 { #category : #'as yet unclassified' }
@@ -622,22 +606,24 @@ SBStMessageSend >> wrapInCascade [
 	<actionValidIf: #notInCascade>
 
 	| cascade |
-	self assert: self isSelected.
 	cascade := SBStCascade new.
-	self sandblockEditor doMultiSelection: [:selected | | targets |
-		targets := selected collect: #messageSend.
-		(self sandblockEditor submorphsAreConsecutive: targets)
+	
+	self isSelected ifFalse: [self select].
+	
+	self sandblockEditor doMultiSelection: [:selected |
+		(self sandblockEditor submorphsAreConsecutive: selected)
 			ifFalse: [nil]
 			ifTrue: [
 				SBWrapConsecutiveCommand new
 					targets: (selected collect: #messageSend);
-					outer: SBStCascade new;
+					outer: cascade;
 					wrap: [:outer :inner |
 						outer addMorphFront: inner first receiver.
 						outer addAllMorphs: inner];
 					wrapUndo: [:outer :inner |
 						inner do: [:message | message receiver: outer receiver veryDeepCopy].
-						outer removeAllMorphs]]]
+						outer removeAllMorphs]]].
+	cascade selectLastInsertPosition
 ]
 
 { #category : #converting }

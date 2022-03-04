@@ -29,7 +29,7 @@ SBCursorNone >> color [
 ]
 
 { #category : #'as yet unclassified' }
-SBCursorNone >> drawOn: aCanvas in: aRectangle [
+SBCursorNone >> drawOn: aCanvas in: aRectangle color: aColor [
 
 	
 ]
@@ -44,6 +44,12 @@ SBCursorNone >> hash [
 SBCursorNone >> horizontalOffsetInFloat [
 
 	^ 0
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorNone >> minimalBounds [
+
+	^ self bounds
 ]
 
 { #category : #'as yet unclassified' }

@@ -5,10 +5,32 @@ Class {
 }
 
 { #category : #'as yet unclassified' }
+SBBlockTest >> testDeepCopy [
+
+	| myBlock editor copy |
+	myBlock := SBBlock new.
+	editor := self editorFor: myBlock.
+	editor when: #selectionChanged send: #update to: myBlock.
+	
+	self assert: 1 equals: myBlock actionMap size.
+	self assert: 1 equals: myBlock veryDeepCopy actionMap size.
+	self assert: editor equals: myBlock actionMap anyOne receiver sandblockEditor.
+	self assert: nil equals: myBlock veryDeepCopy actionMap anyOne receiver sandblockEditor.
+	
+	myBlock := SBBlock new.
+	myBlock addMorphBack: SBBlock new.
+	myBlock firstSubmorph when: #abc send: #test to: myBlock.
+	self assert: 1 equals: myBlock firstSubmorph actionMap size.
+	copy := myBlock veryDeepCopy.
+	self assert: 1 equals: copy firstSubmorph actionMap size.
+	self assert: copy equals: copy firstSubmorph actionMap anyOne receiver
+]
+
+{ #category : #'as yet unclassified' }
 SBBlockTest >> testLeftRotateBinaryMessages [
 
 	| block selection editor |
-	block := '[(a + b) * c]' parseAsSandblock.
+	block := self parse: '[(a + b) * c]'.
 	editor := self methodFor: block.
 	selection := block statements first receiver.
 	selection leftRotate.
@@ -23,7 +45,7 @@ SBBlockTest >> testLeftRotateBinaryMessages [
 SBBlockTest >> testRotateBlock [
 
 	| block selection editor |
-	block := '[a or: [b]]' parseAsSandblock.
+	block := self parse: '[a or: [b]]'.
 	editor := self methodFor: block.
 	selection := block statements first arguments first.
 	selection leftRotate.
@@ -38,7 +60,7 @@ SBBlockTest >> testRotateBlock [
 SBBlockTest >> testRotateKeywordMessage [
 
 	| block selection editor |
-	block := '[(a or: b) ifTrue: c]' parseAsSandblock.
+	block := self parse: '[(a or: b) ifTrue: c]'.
 	editor := self methodFor: block.
 	selection := block statements first receiver.
 	selection leftRotate.
@@ -53,7 +75,7 @@ SBBlockTest >> testRotateKeywordMessage [
 SBBlockTest >> testSwap [
 
 	| block selection n5 n3 |
-	block := '[5 squared: 3]' parseAsSandblock.
+	block := self parse: '[5 squared: 3]'.
 	self methodFor: block.
 	selection := block statements first.
 	n5 := selection receiver.

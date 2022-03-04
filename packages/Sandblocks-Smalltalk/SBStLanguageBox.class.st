@@ -4,23 +4,32 @@ Class {
 	#category : #'Sandblocks-Smalltalk'
 }
 
-{ #category : #'as yet unclassified' }
-SBStLanguageBox class >> matches: aMessageSend [
+{ #category : #suggestions }
+SBStLanguageBox class >> instanceSuggestion [
 
-	^ (false) and: [aMessageSend selector = 'eval:lang:']
+	^ [
+		SBStLanguageBox new
+			source: '' lang: 'scheme';
+			yourself]
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : #testing }
+SBStLanguageBox class >> matches: aMessageSend [
+
+	^ aMessageSend selector = 'eval:lang:'
+]
+
+{ #category : #'instance creation' }
 SBStLanguageBox class >> newFor: aBlock [
 
 	^ self new source: aBlock arguments first contents lang: aBlock arguments second contents
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : #suggestions }
 SBStLanguageBox class >> suggestion [
 
 	^ [:block | | box |
-		box := SBStLanguageBox new source: '' lang: 'scheme'.
+		box := self instanceSuggestion value.
 		block sandblockEditor do: (SBReplaceCommand new
 			target: block;
 			replacer: box).
@@ -83,6 +92,6 @@ SBStLanguageBox >> writeSourceOn: aStream [
 	aStream nextPutAll: ' eval: '.
 	aStream store: self root sourceString.
 	aStream nextPutAll: ' lang: '.
-	aStream nextPutAll: self language.
+	aStream store: self language.
 	aStream nextPutAll: ')'
 ]

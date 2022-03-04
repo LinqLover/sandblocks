@@ -26,6 +26,9 @@ SBTextInputTest >> testAcceptAutoCompletion [
 	[editor openInWorld.
 	editor startInput: block statements first messageParts first at: 9e8 replacingContents: false.
 	self send: (self keyboardEvent: $r) to: editor.
+	
+	self tick.
+	
 	self send: (self keyboardEvent: Character tab) to: editor.
 	
 	self assert: block statements first selector size > 5] ensure: [editor delete]
@@ -46,8 +49,10 @@ SBTextInputTest >> testCursorKeepsHorizontalPosition [
 	
 	self assert: 3 equals: block statements second currentTextMorph cursor.
 	self send: (self keyboardEvent: Character arrowDown) to: editor.
+	self send: (self keyboardEvent: Character arrowDown) to: editor.
 	self tick.
 	self assert: 3 equals: block statements third currentTextMorph cursor.
+	self send: (self keyboardEvent: Character arrowUp) to: editor.
 	self send: (self keyboardEvent: Character arrowUp) to: editor.
 	self tick.
 	self assert: 3 equals: block statements second currentTextMorph cursor

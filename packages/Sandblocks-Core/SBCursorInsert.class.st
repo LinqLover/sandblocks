@@ -30,6 +30,42 @@ SBCursorInsert >> adjacent: aBlock [
 ]
 
 { #category : #'as yet unclassified' }
+SBCursorInsert >> basicBoundsWithWidth: aNumber [
+
+	| inset |
+	bounds ifNotNil: [^ bounds].
+	
+	^ self hasHorizontalLayout
+		ifTrue: [
+			self adjacent
+				ifNil: [ | height |
+					inset := self container layoutInset asEdgeInsets.
+					height := self container height max: TextStyle defaultFont height // 2.
+					self before
+						ifTrue: [self container topLeft + inset topLeft - (aNumber // 2 @ 0) extent: aNumber @ (height - inset vertical)]
+						ifFalse: [self container topRight - (aNumber // 2 + inset right @ inset top negated) extent: aNumber @ (height - inset vertical)]]
+				ifNotNil: [
+					self before
+						ifTrue: [self adjacent topLeft - (aNumber // 2 @ 0) extent: aNumber @ self adjacent height]
+						ifFalse: [self adjacent topRight extent: aNumber @ self adjacent height]]]
+		ifFalse: [
+			self adjacent
+				ifNil: [
+					inset := self container layoutInset asEdgeInsets.
+					"if we are in an empty container with vertical layout, we may get a 1x1 sized cursor. Scale it to be the font's height instead."
+					self container width - inset x < 5
+						ifTrue: [self container topLeft + inset topLeft extent: self lineWidth @ TextStyle defaultFont height]
+						ifFalse: [
+							self before
+								ifTrue: [self container topLeft + inset topLeft extent: self container width - inset horizontal @ aNumber]
+								ifFalse: [self container bottomLeft - (inset left negated @ (aNumber + inset bottom)) extent: self container width - inset horizontal @ aNumber]]]
+				ifNotNil: [
+					self before
+						ifTrue: [self adjacent topLeft - (0 @ (aNumber // 2)) extent: self adjacent width @ aNumber]
+						ifFalse: [self adjacent bottomLeft extent: self adjacent width @ aNumber]]]
+]
+
+{ #category : #'as yet unclassified' }
 SBCursorInsert >> before [
 
 	^ before
@@ -50,37 +86,22 @@ SBCursorInsert >> block [
 { #category : #'as yet unclassified' }
 SBCursorInsert >> bounds [
 
-	bounds ifNotNil: [^ bounds].
-	
-	^ self container hasHorizontalLayout
-		ifTrue: [
-			self adjacent
-				ifNil: [ | inset |
-					inset := self container layoutInset asEdgeInsets.
-					self before
-						ifTrue: [self container topLeft + inset topLeft - (self lineWidth // 2 @ 0) extent: self lineWidth @ (self container height - inset vertical)]
-						ifFalse: [self container topRight - (self lineWidth // 2 + inset right @ inset top negated) extent: self lineWidth @ (self container height - inset vertical)]]
-				ifNotNil: [
-					self before
-						ifTrue: [self adjacent topLeft - (self lineWidth // 2 @ 0) extent: self lineWidth @ self adjacent height]
-						ifFalse: [self adjacent topRight extent: self lineWidth @ self adjacent height]]]
-		ifFalse: [
-			self adjacent
-				ifNil: [ | inset |
-					inset := self container layoutInset asEdgeInsets.
-					self before
-						ifTrue: [self container topLeft + inset topLeft extent: self container width - inset horizontal @ self lineWidth]
-						ifFalse: [self container bottomLeft - (inset left negated @ (self lineWidth + inset bottom)) extent: self container width - inset horizontal @ self lineWidth]]
-				ifNotNil: [
-					self before
-						ifTrue: [self adjacent topLeft - (0 @ (self lineWidth // 2)) extent: self adjacent width @ self lineWidth]
-						ifFalse: [self adjacent bottomLeft extent: self adjacent width @ self lineWidth]]]
+	^ self boundsWithWidth: self lineWidth
 ]
 
 { #category : #'as yet unclassified' }
 SBCursorInsert >> bounds: aRectangle [
 
 	bounds := aRectangle
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorInsert >> boundsWithWidth: aNumber [
+
+	| b |
+	b := self basicBoundsWithWidth: aNumber.
+	(b width <= self lineWidth and: [b height <= self lineWidth]) ifTrue: [^ b origin extent: self lineWidth @ TextStyle defaultFont height].
+	^ b
 ]
 
 { #category : #'as yet unclassified' }
@@ -114,16 +135,39 @@ SBCursorInsert >> container: aBlock [
 ]
 
 { #category : #'as yet unclassified' }
-SBCursorInsert >> drawOn: aCanvas in: aRectangle [
+SBCursorInsert >> drawOn: aCanvas in: aRectangle color: aColor [
 
-	aCanvas fillRectangle: aRectangle color: self color
+	SBToggledCode comment: '' active: 1 do: {
+		[ | r |
+			r := aRectangle expandBy: -1.
+			aCanvas
+				line: r topLeft
+				to: (aRectangle height > 4 ifTrue: [r bottomLeft] ifFalse: [r topRight])
+				width: (aRectangle height > 4 ifTrue: [aRectangle width] ifFalse: [aRectangle height])
+				color: aColor
+				dashLength: 1
+				secondColor: Color transparent
+				secondDashLength: 5
+				startingOffset: 0].
+		[aCanvas fillRectangle: aRectangle color: self color]}
 ]
 
 { #category : #'as yet unclassified' }
-SBCursorInsert >> enter [
+SBCursorInsert >> enterWith: aCursor [
 
-	super enter.
-	self triggerEvent: #showLabel with: (command title ifNil: ['insert in ', self container printString])
+	super enterWith: aCursor.
+	aCursor showLabel: (command title ifNil: ['insert in ', self container printString]).
+	command suggestions ifNotEmpty: [:s |
+		aCursor editor suggestionMenu
+			suggestions: s;
+			focusOnOpen: false;
+			openNear: aCursor requestor: command]
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorInsert >> hasHorizontalLayout [
+
+	^ (command ifNil: [container]) hasHorizontalLayout
 ]
 
 { #category : #'as yet unclassified' }
@@ -143,15 +187,36 @@ SBCursorInsert >> horizontalOffsetInFloat [
 ]
 
 { #category : #'as yet unclassified' }
-SBCursorInsert >> leaveIn: anEditor [
+SBCursorInsert >> isDistinctFrom: aPosition [
 
-	self triggerEvent: #showLabel with: nil
+	^ self class = aPosition class
+		ifTrue: [(self command hasSamePositionAs: aPosition command) not]
+		ifFalse: [self ~= aPosition]
+]
+
+{ #category : #testing }
+SBCursorInsert >> isInsert [
+
+	^ true
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorInsert >> leaveIn: anEditor with: aCursor [
+
+	aCursor showLabel: nil.
+	aCursor editor suggestionMenu delete
 ]
 
 { #category : #'as yet unclassified' }
 SBCursorInsert >> lineWidth [
 
 	^ 3
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorInsert >> minimalBounds [
+
+	^ self boundsWithWidth: 0
 ]
 
 { #category : #'as yet unclassified' }
@@ -176,6 +241,21 @@ SBCursorInsert >> objectInterface [
 	^ self container
 		objectInterfaceNear: self adjacent
 		at: (self before ifTrue: [#before] ifFalse: [#after])
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorInsert >> printOn: aStream [
+
+	aStream nextPutAll: self className.
+	aStream nextPut: $(.
+	aStream print: self container.
+	aStream nextPut: $)
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorInsert >> secondaryInsertPosition [
+
+	^ self command secondaryInsertPosition
 ]
 
 { #category : #'as yet unclassified' }

@@ -38,13 +38,13 @@ SBCursorSelect >> color [
 ]
 
 { #category : #'as yet unclassified' }
-SBCursorSelect >> drawOn: aCanvas in: aRectangle [
+SBCursorSelect >> drawOn: aCanvas in: aRectangle color: aColor [
 
 	aCanvas
 		frameRoundRect: (aRectangle insetBy: 2)
 		radius: self block colorPolicy cornerRadius
 		width: self block frameSize
-		color: self color
+		color: aColor
 ]
 
 { #category : #'as yet unclassified' }
@@ -61,6 +61,18 @@ SBCursorSelect >> horizontalOffsetInFloat [
 			reference := self bounds center x.
 			reference - float left]
 		ifNil: [self bounds center x]
+]
+
+{ #category : #testing }
+SBCursorSelect >> isSelect [
+
+	^ true
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorSelect >> minimalBounds [
+
+	^ self block bounds
 ]
 
 { #category : #'as yet unclassified' }

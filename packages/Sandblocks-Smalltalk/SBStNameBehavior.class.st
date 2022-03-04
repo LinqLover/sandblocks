@@ -44,6 +44,12 @@ SBStNameBehavior >> block: aBlock [
 ]
 
 { #category : #'as yet unclassified' }
+SBStNameBehavior >> castToUnknownWhenEmpty [
+
+	^ self block isExpression
+]
+
+{ #category : #'as yet unclassified' }
 SBStNameBehavior >> contents [
 
 	^ self block contents
@@ -165,6 +171,12 @@ SBStNameBehavior >> fixActionsForUppercaseBinding [
 ]
 
 { #category : #'as yet unclassified' }
+SBStNameBehavior >> globalSuggestions [
+
+	^ (self block completionSuggestionsForBinding: self contents), (self block completionSuggestionsForProjection: self contents)
+]
+
+{ #category : #'as yet unclassified' }
 SBStNameBehavior >> guessedClass [
 
 	^ self block binding ifNotNil: [:b | b value class]
@@ -237,19 +249,9 @@ SBStNameBehavior >> isTemporaryVariable [
 ]
 
 { #category : #'as yet unclassified' }
-SBStNameBehavior >> lowercaseSuggestions [
+SBStNameBehavior >> localSuggestions [
 
-	^ Array streamContents: [:str |
-		self block containingArtefact declarations
-			select: [:v | v contents sandblockMatch: self contents]
-			thenDo: [:v | str nextPut: v asSuggestionItem].
-		self block containingBlocksDo: [:block |
-			block temporaries
-				select: [:v | v contents sandblockMatch: self contents]
-				thenDo: [:v | str nextPut: v asSuggestionItem].
-			block bindings
-				select: [:v | v contents sandblockMatch: self contents]
-				thenCollect: [:v | str nextPut: v asSuggestionItem]]]
+	^ Array streamContents: [:stream | self block scopesDo: [:scope | scope declarationsDo: [:decl | (decl contents sandblockMatch: self contents) ifTrue: [stream nextPut: decl asSuggestionItem]]]]
 ]
 
 { #category : #'as yet unclassified' }
@@ -277,34 +279,23 @@ SBStNameBehavior >> resolveBinding [
 ]
 
 { #category : #'as yet unclassified' }
+SBStNameBehavior >> suggestions [
+
+	| suggestions |
+	suggestions := self contents ifEmpty: [#()] ifNotEmpty: [
+		Array streamContents: [:stream |
+			stream
+				nextPutAll: self localSuggestions;
+				nextPutAll: self globalSuggestions.
+			
+			]].
+	^ suggestions sort: #selectorSize ascending
+]
+
+{ #category : #'as yet unclassified' }
 SBStNameBehavior >> symbolsFor: aColorPolicy [
 
 	^ self subclassResponsibility
-]
-
-{ #category : #'as yet unclassified' }
-SBStNameBehavior >> updateSuggestions [
-
-	| suggestions |
-	suggestions := self contents ifEmpty: [#()] ifNotEmpty: [:text |
-		text first isUppercase
-			ifTrue: [self uppercaseSuggestions]
-			ifFalse: [self lowercaseSuggestions]].
-	self block updateSuggestions: (suggestions sort: #selectorSize ascending) showNear: self block
-]
-
-{ #category : #'as yet unclassified' }
-SBStNameBehavior >> uppercaseSuggestions [
-
-	self flag: #todo.
-	"pool dict etc"
-	^ Array streamContents: [:stream |
-		Smalltalk globals keysAndValuesDo: [:key :value |
-			(key sandblockMatch: self contents) ifTrue: [
-				stream nextPut: (SBSuggestionItem selector: key label: ((value isBehavior and: [key == value name])
-					ifTrue: ['class']
-					ifFalse: ['global']))]].
-		SBStSubstitution allSubclassesDo: [:class | (class name sandblockMatch: self contents) ifTrue: [class suggestion ifNotNil: [:block | stream nextPut: ((SBSuggestionItem selector: class name label: 'projection') completionAction: block)]]]]
 ]
 
 { #category : #'as yet unclassified' }
@@ -329,4 +320,10 @@ SBStNameBehavior >> wasDeselected [
 SBStNameBehavior >> wasSelected [
 
 	
+]
+
+{ #category : #'as yet unclassified' }
+SBStNameBehavior >> writeSourceOn: aStream [
+
+	aStream nextPutAll: self block contents
 ]

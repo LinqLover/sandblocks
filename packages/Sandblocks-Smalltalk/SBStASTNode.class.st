@@ -25,11 +25,11 @@ SBStASTNode class >> registerShortcuts: aProvider [
 
 	aProvider
 		cmdShortcut: $" do: #wrapInToggledCode;
-		registerShortcut: $[ do: #wrapInBlock;
-		registerShortcut: ${ do: #wrapInDynamicArray;
+		noInsertShortcut: $[ do: #wrapInBlock;
+		noInsertShortcut: ${ do: #wrapInDynamicArray;
 		cmdShortcut: $: do: #wrapInAssignment;
-		registerShortcut: $; do: #wrapInCascade;
-		registerShortcut: $^ do: #wrapInReturn;
+		noInsertShortcut: $; do: #wrapInCascade;
+		noInsertShortcut: $^ do: #wrapInReturn;
 		cmdShortcut: $' do: #useAsStString;
 		cmdShortcut: $# do: #useAsStSymbol;
 		cmdShortcut: $$ do: #useAsStCharacter;
@@ -41,6 +41,101 @@ SBStASTNode class >> registerShortcuts: aProvider [
 SBStASTNode >> actionProviders [
 
 	^ {self grammarHandler}, super actionProviders
+]
+
+{ #category : #suggestions }
+SBStASTNode >> artefactCompletionBindingsFor: aBlock [
+	"May be overridden by subclasses."
+
+	^ Smalltalk globals declarations
+]
+
+{ #category : #suggestions }
+SBStASTNode >> artefactCompletionBindingsFor: aBlock matching: matchString [
+
+	^ self
+		completionKeysFrom: (self artefactCompletionBindingsFor: aBlock)
+		matching: matchString
+		stringBlock: [:binding | binding key]
+]
+
+{ #category : #suggestions }
+SBStASTNode >> artefactCompletionProjectionsFor: aBlock class: aClass [
+	"May be overridden by subclasses."
+
+	^ SBStSubstitution allSubclasses
+]
+
+{ #category : #suggestions }
+SBStASTNode >> artefactCompletionProjectionsFor: aBlock matching: matchString [
+	"May be overridden by subclasses."
+
+	^ self
+		completionKeysFrom: (self artefactCompletionProjectionsFor: aBlock class: aBlock guessClassExpensive)
+		matching: matchString
+		stringBlock: [:projectionClass | projectionClass name]
+]
+
+{ #category : #suggestions }
+SBStASTNode >> artefactCompletionSelectorsForSend: aBlock class: aClass [
+
+	| list |
+	list := aClass
+		ifNil: [Symbol allSymbols select: [:ea | [ea isMessageSelector] on: Error do: [false]]]
+		ifNotNil: [aClass sandblocksSuggestionsFor: self].
+	self selector ifNotNil: [:sel | list := list copyWith: sel].
+	^ list
+]
+
+{ #category : #suggestions }
+SBStASTNode >> artefactCompletionSelectorsForSend: aBlock matching: matchString [
+
+	^ self
+		completionSelectorsFrom: (self artefactCompletionSelectorsForSend: aBlock class: aBlock guessClassExpensive)
+		matching: matchString
+]
+
+{ #category : #suggestions }
+SBStASTNode >> artefactCompletionSelectorsForSymbol: aBlock matching: matchString [
+	"May be overridden by subclasses."
+
+	^ self completionSelectorsFrom: Symbol allSymbols matching: matchString
+]
+
+{ #category : #suggestions }
+SBStASTNode >> artefactCompletionSuggestionsForBinding: aBlock matching: matchString [
+	"May be overridden by subclasses."
+
+	^ (self artefactCompletionBindingsFor: aBlock matching: matchString) collect: [:binding |
+		SBSuggestionItem selector: binding key label: ((binding value isBehavior and: [binding key == binding value name])
+			ifTrue: ['class']
+			ifFalse: ['global'])]
+]
+
+{ #category : #suggestions }
+SBStASTNode >> artefactCompletionSuggestionsForProjection: aBlock matching: matchString [
+	"May be overridden by subclasses."
+
+	^ (self artefactCompletionProjectionsFor: aBlock matching: matchString) collect: [:projectionClass |
+		(SBProjectionSuggestionItem selector: projectionClass name label: 'projection')
+			completionAction: projectionClass suggestion;
+			instanceSuggestion: projectionClass instanceSuggestion
+				editor: aBlock sandblockEditor;
+			yourself]
+]
+
+{ #category : #suggestions }
+SBStASTNode >> artefactCompletionSuggestionsForSend: aBlock matching: matchString [
+	"May be overridden by subclasses."
+
+	^ (self artefactCompletionSelectorsForSend: aBlock matching: matchString) collect: [:symbol | SBSuggestionItem selector: symbol label: 'send']
+]
+
+{ #category : #suggestions }
+SBStASTNode >> artefactCompletionSuggestionsForSymbol: aBlock matching: matchString [
+	"May be overridden by subclasses."
+
+	^ (self artefactCompletionSelectorsForSymbol: aBlock matching: matchString) collect: [:symbol | SBSuggestionItem selector: symbol label: 'symbol']
 ]
 
 { #category : #converting }
@@ -59,10 +154,25 @@ SBStASTNode >> asMorphBlock: converter [
 	" we can't generally convert ourselves to morphs since we need our artefact owner "
 ]
 
+{ #category : #actions }
+SBStASTNode >> browseImplementors [
+
+	^ self grammarHandler
+		block: self;
+		browseImplementors
+]
+
 { #category : #testing }
 SBStASTNode >> canEvaluate [
 
 	^ self isExpression
+]
+
+{ #category : #caching }
+SBStASTNode >> clearCacheSelf [
+
+	super clearCacheSelf.
+	self removeProperty: #guessedClassExpensive
 ]
 
 { #category : #evaluate }
@@ -78,6 +188,30 @@ SBStASTNode >> compilationCueWith: aRequestor for: aContext [
 		class: class
 		environment: class environment
 		requestor: aRequestor
+]
+
+{ #category : #suggestions }
+SBStASTNode >> completionSuggestionsForBinding: matchString [
+
+	^ (self containingArtefact ifNil: [^ #()])
+		artefactCompletionSuggestionsForBinding: self
+		matching: matchString
+]
+
+{ #category : #suggestions }
+SBStASTNode >> completionSuggestionsForProjection: matchString [
+
+	^ (self containingArtefact ifNil: [^ #()])
+		artefactCompletionSuggestionsForProjection: self
+		matching: matchString
+]
+
+{ #category : #suggestions }
+SBStASTNode >> completionSuggestionsForSend: matchString [
+
+	^ (self containingArtefact ifNil: [^ #()])
+		artefactCompletionSuggestionsForSend: self
+		matching: matchString
 ]
 
 { #category : #evaluate }
@@ -134,17 +268,18 @@ SBStASTNode >> grammarHandler [
 SBStASTNode >> guessClassExpensive [
 
 	^ self guessedClass ifNil: [
-		Smalltalk at: #Sandbox ifPresent: [:sandboxClass |
-			[
-				sandboxClass new
-					stepLimit: 100000;
-					evaluate: [
-							self evaluate ifNotNil: [:result |
-								[result class] on: MessageNotUnderstood do: ["might be ProtoObject"
-								thisContext objectClass: result]]]
-						ifFailed: [nil]]
-				on: (Smalltalk at: #SandboxError)
-				do: [:err | nil]]]
+		self valueOfProperty: #guessedClassExpensive ifAbsentPut: [
+			Smalltalk at: #Sandbox ifPresent: [:sandboxClass |
+				[
+					sandboxClass new
+						stepLimit: 100000;
+						evaluate: [
+								self evaluate ifNotNil: [:result |
+									[result class] on: MessageNotUnderstood do: ["might be ProtoObject"
+									thisContext objectClass: result]]]
+							ifFailed: [nil]]
+					on: (Smalltalk at: #SandboxError)
+					do: [:err | nil]]]]
 ]
 
 { #category : #accessing }
@@ -279,18 +414,6 @@ SBStASTNode >> selector [
 SBStASTNode >> sourceString [
 
 	^ String streamContents: [:s | self writeSourceOn: s]
-]
-
-{ #category : #input }
-SBStASTNode >> startInputAt: aNumber replacingContents: aBoolean [
-
-	| result |
-	result := super startInputAt: aNumber replacingContents: aBoolean.
-	
-	(self suggestAlways and: [aBoolean not] and: [self respondsTo: #updateSuggestions]) ifTrue: [
-		Project current addDeferredUIMessage: [self flag: #todo "appears at wrong position otherwise for first char" ;updateSuggestions]].
-	
-	^ result
 ]
 
 { #category : #accessing }

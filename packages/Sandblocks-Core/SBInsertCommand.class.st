@@ -5,9 +5,10 @@ Class {
 		'index',
 		'morph',
 		'container',
-		'select'
+		'select',
+		'title'
 	],
-	#category : 'Sandblocks-Core'
+	#category : #'Sandblocks-Core'
 }
 
 { #category : #'as yet unclassified' }
@@ -34,6 +35,16 @@ SBInsertCommand >> do [
 SBInsertCommand >> hasSamePositionAs: aCommand [
 
 	^ aCommand class ~= SBCombinedCommand and: [self container = aCommand container and: [self index = aCommand index]]
+]
+
+{ #category : #'as yet unclassified' }
+SBInsertCommand >> hintBounds [
+
+	^ SBCursorInsert new
+		before: index <= container submorphCount;
+		adjacent: (container submorphs at: index ifAbsent: [nil]);
+		container: container;
+		boundsWithWidth: 3
 ]
 
 { #category : #'as yet unclassified' }
@@ -76,6 +87,18 @@ SBInsertCommand >> select: aBlock [
 SBInsertCommand >> setArtefactFrom [
 
 	^ container
+]
+
+{ #category : #'as yet unclassified' }
+SBInsertCommand >> title [
+
+	^ title
+]
+
+{ #category : #'as yet unclassified' }
+SBInsertCommand >> title: aString [
+
+	title := aString
 ]
 
 { #category : #'as yet unclassified' }

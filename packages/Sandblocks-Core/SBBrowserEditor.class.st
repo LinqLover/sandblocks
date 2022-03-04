@@ -146,7 +146,7 @@ SBBrowserEditor >> modelSelection: anObject [
 		^ self].
 	
 	anObject isCompiledMethod ifTrue: [
-		model selectedClass ~= anObject methodClass ifTrue: [model selectClass: anObject methodClass theNonMetaClass].
+		((model respondsTo: #selectClass:) and: [model selectedClass ~= anObject methodClass]) ifTrue: [model selectClass: anObject methodClass theNonMetaClass].
 		((model respondsTo: #selectMessageCategoryNamed:) and: [model messageCategoryListSelection ~= anObject methodReference category]) ifTrue: [model selectMessageCategoryNamed: anObject methodReference category].
 		((model respondsTo: #selectMessageNamed:) and: [model selectedMessage ~= anObject selector]) ifTrue: [model selectMessageNamed: anObject selector].
 		model
@@ -168,7 +168,7 @@ SBBrowserEditor >> save: anArtefact tryFixing: aFixBoolean quick: aQuickBoolean 
 	| ret |
 	ret := super save: anArtefact tryFixing: aFixBoolean quick: aQuickBoolean.
 	
-	model ifNotNil: [((anArtefact object isBehavior or: [anArtefact object isCompiledMethod]) and: [self modelSelection ~~ anArtefact object]) ifTrue: [self modelSelection: anArtefact object]].
+	model ifNotNil: [((anArtefact object isBehavior or: [anArtefact object isCompiledMethod]) and: [self modelSelection ~~ anArtefact object and: [anArtefact containingFloat = self]]) ifTrue: [self modelSelection: anArtefact object]].
 	^ ret
 ]
 

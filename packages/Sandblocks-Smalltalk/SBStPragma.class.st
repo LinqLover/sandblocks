@@ -110,12 +110,6 @@ SBStPragma >> startInputAt: aNumber replacingContents: aBoolean [
 ]
 
 { #category : #'as yet unclassified' }
-SBStPragma >> stopEditing: aCommand [
-
-	signature stopEditing: aCommand
-]
-
-{ #category : #'as yet unclassified' }
 SBStPragma >> symbols [
 
 	^ self colorPolicy symbolsForPragma: self
@@ -128,9 +122,9 @@ SBStPragma >> tryDelete [
 ]
 
 { #category : #'as yet unclassified' }
-SBStPragma >> useSuggestion: aString [
+SBStPragma >> useSuggestion: anItem [
 
-	signature selectorAndEdit: aString
+	signature selectorAndEdit: anItem contents
 ]
 
 { #category : #'as yet unclassified' }

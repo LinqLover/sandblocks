@@ -1,14 +1,18 @@
 Class {
 	#name : #SBGrammarHandler,
 	#superclass : #Object,
+	#instVars : [
+		'currentBlock'
+	],
 	#category : #'Sandblocks-Core'
 }
 
 { #category : #helper }
 SBGrammarHandler class >> eventValidForString: anEvent [
 
-	(anEvent commandKeyPressed or: [anEvent optionKeyPressed or: [anEvent controlKeyPressed]]) ifTrue: [^ false].
-	
+	| keysWithCmd |
+	keysWithCmd := '{[]}'.
+	((anEvent commandKeyPressed or: [anEvent optionKeyPressed or: [anEvent controlKeyPressed]]) and: [(keysWithCmd includes: anEvent keyCharacter) not]) ifTrue: [^ false].
 	^ anEvent keyCharacter isPrintable
 ]
 
@@ -76,16 +80,13 @@ SBGrammarHandler >> insertStatementAboveOrBelow: anAboveBoolean [
 	(topMost hasOwner: self block containingArtefact) ifFalse: [topMost := nil].
 	body := ((topMost isNil or: [topMost parentSandblock isNil])
 		ifFalse: [topMost parentSandblock]
-		ifTrue: [self block containingArtefact nextBlockThat: [:b | b isBlockBody]]) ifNil: [
-			self block isBlockBody ifTrue: [self block] ifFalse: [^ self]].
+		ifTrue: [self block containingArtefact nextBlockThat: [:b | b isBlockBody]]) ifNil: [self block isBlockBody ifTrue: [self block] ifFalse: [^ self]].
 	
 	(body = self block containingFloat or: [body hasOwner: self block containingFloat]) ifFalse: [^ self].
 	
 	newStatement := body newEmptyChildNear: topMost before: anAboveBoolean.
 	
-	self block sandblockEditor
-		do: (body insertCommandRequest: newStatement near: topMost before: anAboveBoolean);
-		startInput: newStatement at: 1 replacingContents: false
+	self block sandblockEditor do: (body insertCommandRequest: newStatement near: topMost before: anAboveBoolean)
 ]
 
 { #category : #actions }
@@ -153,6 +154,12 @@ SBGrammarHandler >> startOverrideInput: anEvent in: anEditor [
 	anEditor selection changeToUnknown.
 	anEditor mode = #input ifTrue: [
 		anEditor selection keyStroke: anEvent]
+]
+
+{ #category : #callbacks }
+SBGrammarHandler >> suggestionsFor: aBlock [
+
+	^ #()
 ]
 
 { #category : #actions }

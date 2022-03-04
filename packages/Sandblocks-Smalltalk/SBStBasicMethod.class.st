@@ -171,6 +171,22 @@ SBStBasicMethod >> changeToUnknown [
 ]
 
 { #category : #accessing }
+SBStBasicMethod >> classVariables [
+
+	| editor |
+	editor := self sandblockEditor.
+	^ Array streamContents: [:stream |
+		self methodClass withAllSuperclassesDo: [:class | | open |
+			open := [class classVarNames collect: [:name | SBStName classVariable: name class: class]].
+			stream nextPutAll: (SBToggledCode comment: '' active: 1 do: {
+				[open value].
+				[
+					editor
+						ifNil: open
+						ifNotNil: [editor blockFor: class withInterfaces: #(#isEditor) ifOpen: [:c | c classVariables] ifClosed: open]]})]]
+]
+
+{ #category : #accessing }
 SBStBasicMethod >> collapsed: aBoolean [
 
 	self body visible not = aBoolean ifTrue: [^ self].
@@ -257,7 +273,21 @@ SBStBasicMethod >> currentSelector: aString [
 { #category : #accessing }
 SBStBasicMethod >> declarations [
 
-	^ self arguments, self instanceVariables
+	^ Array streamContents: [:stream |
+		self declarationsDo: [:declaration |
+			stream nextPut: declaration.
+			
+			].
+		
+		]
+]
+
+{ #category : #accessing }
+SBStBasicMethod >> declarationsDo: aBlock [
+
+	self arguments do: aBlock.
+	self instanceVariables do: aBlock.
+	self classVariables do: aBlock
 ]
 
 { #category : #actions }
@@ -423,6 +453,12 @@ SBStBasicMethod >> isMyArgument: aBlock [
 	^ false
 ]
 
+{ #category : #'ast helpers' }
+SBStBasicMethod >> isScope [
+
+	^ true
+]
+
 { #category : #testing }
 SBStBasicMethod >> isTopLevel [
 
@@ -437,7 +473,7 @@ SBStBasicMethod >> methodChanged: anEvent [
 		anEvent isModified ifTrue: [
 			^ self hasUnsavedChanges
 				ifTrue: [self externalModification: true]
-				ifFalse: [self reloadMethodInPlace]]]
+				ifFalse: [self reloadMethodInPlaceUndoable: false]]]
 ]
 
 { #category : #accessing }
@@ -600,21 +636,29 @@ SBStBasicMethod >> relatedClass [
 SBStBasicMethod >> reloadArtefact [
 	<action>
 
-	self sandblockEditor select: self reloadMethodInPlace
+	| newMethod |
+	newMethod := self reloadMethodInPlaceUndoable: true.
+	
+	newMethod exists ifTrue: [newMethod select] ifFalse: [newMethod inputContainedUnknown]
 ]
 
 { #category : #caching }
-SBStBasicMethod >> reloadMethodInPlace [
+SBStBasicMethod >> reloadMethodInPlaceUndoable: aBoolean [
 
 	| reloaded |
 	self externalModification: false.
-	reloaded := self compiledMethod asSandblock
+	reloaded := (self exists
+		ifTrue: [self compiledMethod asSandblock]
+		ifFalse: [self class selector: '' arguments: #() class: self relatedClass body: SBStBlockBody new])
 		position: self position;
 		hResizing: self hResizing;
 		width: self width;
 		yourself.
-	self replaceBy: reloaded.
-	reloaded withDecorator: SBForceMoveDecorator do: [:d | d createImplicitForces].
+	
+	aBoolean
+		ifTrue: [self sandblockEditor do: (SBReplaceCommand new target: self replacer: reloaded)]
+		ifFalse: [self replaceBy: reloaded].
+	Project current addDeferredUIMessage: [reloaded withDecorator: SBForceMoveDecorator do: [:d | d createImplicitForces]].
 	^ reloaded
 ]
 

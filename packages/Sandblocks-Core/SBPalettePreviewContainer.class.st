@@ -36,6 +36,17 @@ SBPalettePreviewContainer >> initialize [
 ]
 
 { #category : #'as yet unclassified' }
+SBPalettePreviewContainer >> insertCursorAfter: aMorph [
+
+	| afterSelf referenceBlock |
+	afterSelf := false.
+	referenceBlock := aMorph firstBlock.
+	aMorph parentSandblock cursorPositionsDo: [:c |
+		c block = referenceBlock ifTrue: [afterSelf := true].
+		(afterSelf and: [c isInsert and: [c container ~= aMorph and: [(c container hasOwner: aMorph) not]]]) ifTrue: [^ self sandblockEditor cursor cursorPosition: c explicitMove: true axis: #none]]
+]
+
+{ #category : #'as yet unclassified' }
 SBPalettePreviewContainer >> intoWorld: aWorld [
 
 	super intoWorld: aWorld.
@@ -67,19 +78,13 @@ SBPalettePreviewContainer >> pickUp: anEvent [
 	| editor |
 	editor := self sandblockEditor.
 	
-	anEvent hand grabMorph: (SBSelection new
+	anEvent hand grabMorph: (SBDragContainer new
 		homeArtefact: self containingArtefact;
 		methodClass: (self containingArtefact ifNotNil: #relatedClass);
 		colorPolicy: self colorPolicy;
-		color: (self sandblockBlockColorIfAbsent: [Color white]);
+		color: (self sandblockBlockColorIfAbsent: [Color r: 1 g: 1 b: 1]);
 		addMorphBack: self firstSubmorph veryDeepCopy;
 		yourself)
-]
-
-{ #category : #'as yet unclassified' }
-SBPalettePreviewContainer >> sandblockBlockColorIfAbsent: aBlock [
-
-	^ self firstSubmorph preferredColor ifNil: [Color white]
 ]
 
 { #category : #'as yet unclassified' }
@@ -98,4 +103,31 @@ SBPalettePreviewContainer >> saveTryFixing: aFixBoolean quick: aQuickBoolean [
 SBPalettePreviewContainer >> wantsDroppedMorph: aMorph event: evt [
 
 	^ false
+]
+
+{ #category : #'as yet unclassified' }
+SBPalettePreviewContainer >> wasSelected [
+
+	self sandblockEditor select: nil
+]
+
+{ #category : #'as yet unclassified' }
+SBPalettePreviewContainer >> wasSelectedFromCursor: aCursorPosition [
+
+	super wasSelectedFromCursor: aCursorPosition.
+	
+	aCursorPosition mode = #insert ifTrue: [
+		aCursorPosition command canInsert: self firstSubmorph do: [:morph |
+			aCursorPosition command
+				morph: morph;
+				do.
+			Project current addDeferredUIMessage: [
+				SBToggledCode comment: '' active: 1 do: {
+					[self insertCursorAfter: morph].
+					[morph firstBlock select].
+					[
+						self sandblockEditor cursor
+							cursorPosition: aCursorPosition
+							explicitMove: true
+							axis: #none]}]]]
 ]

@@ -34,13 +34,13 @@ SBCursorMultiSelect >> bounds [
 ]
 
 { #category : #'as yet unclassified' }
-SBCursorMultiSelect >> drawOn: aCanvas in: aRectangle [
+SBCursorMultiSelect >> drawOn: aCanvas in: aRectangle color: aColor [
 
 	aCanvas
 		frameRoundRect: (aRectangle insetBy: 2)
 		radius: self block colorPolicy cornerRadius
 		width: self block frameSize
-		color: self color
+		color: aColor
 ]
 
 { #category : #'as yet unclassified' }
@@ -67,10 +67,22 @@ SBCursorMultiSelect >> initialize [
 	selected := OrderedCollection new
 ]
 
+{ #category : #testing }
+SBCursorMultiSelect >> isMultiSelect [
+
+	^ true
+]
+
 { #category : #'as yet unclassified' }
-SBCursorMultiSelect >> leaveIn: anEditor [
+SBCursorMultiSelect >> leaveIn: anEditor with: aCursor [
 
 	selected do: [:block | block detachDecorators: SBMultiSelectionDecorator]
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorMultiSelect >> minimalBounds [
+
+	^ self block bounds
 ]
 
 { #category : #'as yet unclassified' }

@@ -8,7 +8,9 @@ Class {
 		'container',
 		'select',
 		'previousOwner',
-		'previousIndex'
+		'previousIndex',
+		'title',
+		'secondaryInsertPosition'
 	],
 	#category : #'Sandblocks-Core'
 }
@@ -73,6 +75,16 @@ SBRelInsertCommand >> hasSamePositionAs: aCommand [
 ]
 
 { #category : #'as yet unclassified' }
+SBRelInsertCommand >> hintBounds [
+
+	^ SBCursorInsert new
+		before: before;
+		adjacent: adjacent;
+		container: container;
+		boundsWithWidth: 3
+]
+
+{ #category : #'as yet unclassified' }
 SBRelInsertCommand >> index [
 
 	^ self insertIndex
@@ -107,6 +119,18 @@ SBRelInsertCommand >> near: aBlock before: aBoolean in: aContainer morph: aMorph
 ]
 
 { #category : #'as yet unclassified' }
+SBRelInsertCommand >> secondaryInsertPosition [
+
+	^ secondaryInsertPosition ifNil: [false]
+]
+
+{ #category : #'as yet unclassified' }
+SBRelInsertCommand >> secondaryInsertPosition: aBoolean [
+
+	secondaryInsertPosition := aBoolean
+]
+
+{ #category : #'as yet unclassified' }
 SBRelInsertCommand >> select: aBlock [
 
 	select := aBlock
@@ -116,6 +140,18 @@ SBRelInsertCommand >> select: aBlock [
 SBRelInsertCommand >> setArtefactFrom [
 
 	^ container
+]
+
+{ #category : #'as yet unclassified' }
+SBRelInsertCommand >> title [
+
+	^ title ifNil: [super title]
+]
+
+{ #category : #'as yet unclassified' }
+SBRelInsertCommand >> title: aString [
+
+	title := aString
 ]
 
 { #category : #'as yet unclassified' }

@@ -14,6 +14,12 @@ Class {
 	#category : #'Sandblocks-Core'
 }
 
+{ #category : #'as yet unclassified' }
+SBBlockCursor class >> legacyVerticalMovement [
+
+	^ false
+]
+
 { #category : #'vertical movement' }
 SBBlockCursor >> adjacentVerticalCalcDistance: aDistBlock validBlock: aValidBlock [
 
@@ -35,6 +41,39 @@ SBBlockCursor >> adjacentVerticalCalcDistance: aDistBlock validBlock: aValidBloc
 				candidatesBestDistance := distance]
 			ifFalse: [(distance between: candidatesBestDistance and: candidatesBestDistance + tolerance) ifTrue: [candidates add: candidate]]].
 	^ (candidates detectMin: [:candidate | (candidate left - float left to: candidate right - float left) distanceTo: horizontalOffsetInFloat]) ifNotNil: #containingSandblock
+]
+
+{ #category : #'vertical movement' }
+SBBlockCursor >> adjacentVerticalCursorCalcDistance: aDistBlock validBlock: aValidBlock equalBock: anEqualBlock downwards: aBoolean [
+
+	| allCandidates candidates candidatesBestDistance tolerance float preferVerticallyCloseWeight |
+	self selectedBlock ifNil: [^ nil].
+	
+	float := self selectedBlock containingFloat.
+	tolerance := 10.
+	allCandidates := Array streamContents: [:stream | | seenCurrent previousInsert |
+		seenCurrent := false.
+		previousInsert := nil.
+		float cursorPositionsDo: [:pos | | validPosition |
+			pos = cursorPosition ifTrue: [seenCurrent := true].
+			validPosition := (previousInsert isNil or: [previousInsert isDistinctFrom: pos]) and: [(((aValidBlock value: pos) or: [anEqualBlock value: pos value: seenCurrent]) and: [pos class ~= SBCursorInsert or: [pos hasHorizontalLayout not or: [pos container hasChildSandblocks not]]]) and: [pos class ~= SBCursorSelect or: [pos block hasChildSandblocks not and: [pos block currentTextMorph isNil and: [pos block fixedNumberOfChildren]]]]].
+			(validPosition and: [pos ~= cursorPosition]) ifTrue: [stream nextPut: pos].
+			validPosition ifTrue: [(pos isKindOf: SBCursorInsert) ifTrue: [previousInsert := pos]]]].
+	aBoolean ifFalse: [allCandidates reverseInPlace].
+	candidates := OrderedCollection new.
+	candidatesBestDistance := 900000000.
+	allCandidates do: [:candidate | | distance |
+		distance := aDistBlock value: candidate.
+		distance < candidatesBestDistance
+			ifTrue: [
+				(candidatesBestDistance between: distance and: distance + tolerance)
+					ifTrue: [candidates add: candidate]
+					ifFalse: [candidates := OrderedCollection with: candidate].
+				candidatesBestDistance := distance]
+			ifFalse: [(distance between: candidatesBestDistance and: candidatesBestDistance + tolerance) ifTrue: [candidates add: candidate]]].
+	
+	preferVerticallyCloseWeight := 3.
+	^ candidates detectMin: [:candidate | ((candidate left - float left to: candidate right - float left) distanceTo: horizontalOffsetInFloat) + (preferVerticallyCloseWeight * (aDistBlock value: candidate))]
 ]
 
 { #category : #api }
@@ -59,8 +98,12 @@ SBBlockCursor >> cursorAlwaysVisible [
 SBBlockCursor >> cursorForBlock: aBlock at: aPoint [
 
 	^ aBlock startInputCommand
-		ifNotNil: [:command | SBCursorText new block: aBlock; pixelPosition: aPoint; currentCommand: command]
-		ifNil: [SBCursorSelect new block: aBlock]
+		ifNotNil: [:command |
+			SBCursorText new
+				block: aBlock;
+				pixelPosition: aPoint;
+				currentCommand: command]
+		ifNil: [self selectOrInsertFor: aBlock near: aPoint]
 ]
 
 { #category : #accessing }
@@ -80,17 +123,19 @@ SBBlockCursor >> cursorPosition: aPosition explicitMove: aBoolean axis: aSymbol 
 		ifTrue: [
 			cursorPosition := SBCursorNone new.
 			previousCursor ifNotNil: [:c |
-				c leaveIn: self editor.
-				c removeActionsWithReceiver: self].
+				c block ifNotNil: [c block invalidRect: c bounds].
+				c leaveIn: self editor with: self].
 			cursorPosition := aPosition.
-			cursorPosition when: #showLabel send: #showLabel: to: self.
-			cursorPosition ifNotNil: [:position | position enter]]
+			cursorPosition ifNotNil: [:position |
+				position enterWith: self.
+				position block ifNotNil: [position block invalidRect: position bounds]]]
 		ifFalse: [previousCursor maybeUpdateFor: aPosition].
 	
 	self resetBlink.
 	blinkCount := 0.
 	self updateBounds.
 	Project current addDeferredUIMessage: [self updateBounds].
+	self visible: (aPosition block ifNotNil: [:b | b hasOwner: editor canvas] ifNil: [false]).
 	aSymbol ~= #z ifTrue: [selectLargerHistory removeAll].
 	self editor
 		triggerEvent: #selectionChanged with: self selectedBlock;
@@ -103,6 +148,7 @@ SBBlockCursor >> cursorPosition: aPosition explicitMove: aBoolean axis: aSymbol 
 		lastBlinkTime := DateAndTime current.
 		self selectedBlock ifNotNil: [:b |
 			b
+				wasSelectedFromCursor: previousCursor;
 				wasSelected;
 				ensureVisible]]
 ]
@@ -116,7 +162,7 @@ SBBlockCursor >> cursorVisible [
 { #category : #drawing }
 SBBlockCursor >> drawOn: aCanvas [
 
-	self cursorVisible ifTrue: [self cursorPosition drawOn: aCanvas in: self bounds]
+	self cursorVisible ifTrue: [self cursorPosition drawOn: aCanvas in: self bounds color: self color]
 ]
 
 { #category : #accessing }
@@ -166,6 +212,36 @@ SBBlockCursor >> initialize [
 	blinkCount := 0.
 	horizontalOffsetInFloat := 0.
 	cursorPosition := SBCursorNone new
+]
+
+{ #category : #private }
+SBBlockCursor >> insertPositionIn: aBlock near: aPoint [
+
+	aPoint
+		ifNil: [
+			aBlock
+				cursorPositionsDo: [:pos | (pos class = SBCursorInsert and: [pos container containingSandblock = aBlock and: [pos secondaryInsertPosition not]]) ifTrue: [^ pos]]
+				shallow: true]
+		ifNotNil: [ | best bestDistance |
+			best := nil.
+			bestDistance := 20.
+			aBlock
+				cursorPositionsDo: [:pos | | distance |
+					(pos class = SBCursorInsert and: [
+						pos container containingSandblock = aBlock and: [
+							distance := pos minimalBounds distanceTo: aPoint.
+							distance < bestDistance]]) ifTrue: [
+						best := pos.
+						bestDistance := distance]]
+				shallow: true.
+			^ best].
+	^ nil
+]
+
+{ #category : #'as yet unclassified' }
+SBBlockCursor >> isArtefact [ 
+	
+	^ false
 ]
 
 { #category : #layout }
@@ -293,7 +369,7 @@ SBBlockCursor >> moveHorizontal: aNumber wordWise: aBoolean [
 
 	| newPos |
 	newPos := self cursorPosition.
-	[newPos := newPos moveHorizontal: aNumber wordWise: aBoolean] doWhileTrue: [aBoolean and: [newPos class ~= SBCursorText and: [newPos notNil]]].
+	[newPos := newPos moveHorizontal: aNumber wordWise: aBoolean] doWhileTrue: [aBoolean and: [newPos notNil and: [(newPos class = SBCursorText or: [newPos class = SBCursorInsert and: [newPos container wantsInput]]) not]]].
 	newPos ifNil: [^ self].
 	
 	newPos ~= self cursorPosition ifTrue: [newPos placeAtEnd: (aBoolean ifTrue: [aNumber > 0] ifFalse: [aNumber < 0])].
@@ -321,6 +397,18 @@ SBBlockCursor >> nextVertical [
 		validBlock: [:candidate | candidate top >= cursorPosition selectionBounds bottom]
 ]
 
+{ #category : #'vertical movement' }
+SBBlockCursor >> nextVerticalCursor [
+
+	| current |
+	current := cursorPosition minimalBounds.
+	^ self
+		adjacentVerticalCursorCalcDistance: [:candidate | candidate top - current bottom]
+		validBlock: [:candidate | candidate top > current bottom]
+		equalBock: [:candidate :seenCurrent | seenCurrent and: [candidate top = current bottom]]
+		downwards: true
+]
+
 { #category : #api }
 SBBlockCursor >> prepareForNextCommand [
 	" if we have a pending input command, make sure it is finished "
@@ -334,6 +422,18 @@ SBBlockCursor >> previousVertical [
 	^ self
 		adjacentVerticalCalcDistance: [:candidate | cursorPosition selectionBounds top - candidate bottom]
 		validBlock: [:candidate | cursorPosition selectionBounds top >= candidate bottom]
+]
+
+{ #category : #'vertical movement' }
+SBBlockCursor >> previousVerticalCursor [
+
+	| current |
+	current := cursorPosition minimalBounds.
+	^ self
+		adjacentVerticalCursorCalcDistance: [:candidate | current top - candidate bottom]
+		validBlock: [:candidate | current top > candidate bottom]
+		equalBock: [:candidate :seenCurrent | seenCurrent not and: current top = candidate bottom]
+		downwards: false
 ]
 
 { #category : #'events-processing' }
@@ -379,13 +479,21 @@ SBBlockCursor >> select: aBlock [
 
 	aBlock
 		ifNil: [self cursorPosition: SBCursorNone new explicitMove: false axis: #none]
-		ifNotNil: [self cursorPosition: (self cursorForBlock: aBlock at: aBlock topLeft) explicitMove: false axis: #none]
+		ifNotNil: [self cursorPosition: (self cursorForBlock: aBlock at: nil) explicitMove: false axis: #none]
 ]
 
 { #category : #api }
 SBBlockCursor >> selectNoInput: aBlock [
 
 	self cursorPosition: (SBCursorSelect new block: aBlock) explicitMove: false axis: #none
+]
+
+{ #category : #private }
+SBBlockCursor >> selectOrInsertFor: aBlock near: aPoint [
+
+	^ (aBlock dynamicNumberOfChildren
+		ifTrue: [self insertPositionIn: aBlock near: aPoint]
+		ifFalse: [nil]) ifNil: [SBCursorSelect new block: aBlock]
 ]
 
 { #category : #accessing }
@@ -416,7 +524,17 @@ SBBlockCursor >> showLabel: aString [
 { #category : #api }
 SBBlockCursor >> startInput: aBlock at: aNumber replacingContents: aBoolean [
 
-	self cursorPosition: (aBlock startInputCommand ifNotNil: [:command | SBCursorText new block: aBlock; cursorIndex: aNumber; currentCommand: aBlock startInputCommand; replacingContents: aBoolean] ifNil: [SBCursorSelect new block: aBlock]) explicitMove: aBoolean axis: #none
+	self
+		cursorPosition: (aBlock startInputCommand
+			ifNotNil: [:command |
+				SBCursorText new
+					block: aBlock;
+					cursorIndex: aNumber;
+					currentCommand: aBlock startInputCommand;
+					replacingContents: aBoolean]
+			ifNil: [self selectOrInsertFor: aBlock near: nil])
+		explicitMove: aBoolean
+		axis: #none
 ]
 
 { #category : #multiselection }
@@ -455,6 +573,12 @@ SBBlockCursor >> stepTime [
 	^ 0
 ]
 
+{ #category : #'as yet unclassified' }
+SBBlockCursor >> survivesReload [ 
+	
+	^ true
+]
+
 { #category : #api }
 SBBlockCursor >> unhandledEvent: anEvent in: anEditor didHandle: aBlock [
 
@@ -462,7 +586,7 @@ SBBlockCursor >> unhandledEvent: anEvent in: anEditor didHandle: aBlock [
 		cursorPosition unhandledEvent: anEvent in: anEditor didHandle: aBlock]
 ]
 
-{ #category : #'as yet unclassified' }
+{ #category : #drawing }
 SBBlockCursor >> updateBounds [
 
 	| b |

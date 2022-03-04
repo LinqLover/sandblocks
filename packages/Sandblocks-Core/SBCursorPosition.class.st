@@ -14,7 +14,7 @@ SBCursorPosition >> = aPosition [
 SBCursorPosition >> adjacentPosition: aNumber in: anEditor [
 
 	^ self adjacentPosition: aNumber to: self in: (self navigationRootIn: anEditor) that: [:s | " skip over selects unless that block would otherwise not get visited at all "
-	(s isKindOf: SBCursorSelect) not or: [s block currentTextMorph isNil and: [s block hasChildSandblocks not]]]
+	(s isKindOf: SBCursorSelect) not or: [s block currentTextMorph isNil and: [s block hasChildSandblocks not and: [s block dynamicNumberOfChildren not]]]]
 ]
 
 { #category : #'as yet unclassified' }
@@ -36,6 +36,12 @@ SBCursorPosition >> adjacentPosition: aNumber to: aPosition in: anEditor that: a
 SBCursorPosition >> block [
 
 	^ self subclassResponsibility
+]
+
+{ #category : #geometry }
+SBCursorPosition >> bottom [
+
+	^ self minimalBounds bottom
 ]
 
 { #category : #'as yet unclassified' }
@@ -70,13 +76,13 @@ SBCursorPosition >> cursorPositionsIn: aContainer do: aBlock [
 ]
 
 { #category : #'as yet unclassified' }
-SBCursorPosition >> drawOn: aCanvas [
+SBCursorPosition >> drawOn: aCanvas in: aRectangle color: aColor [
 
 	self subclassResponsibility
 ]
 
 { #category : #'as yet unclassified' }
-SBCursorPosition >> enter [
+SBCursorPosition >> enterWith: aCursor [
 
 	
 ]
@@ -111,13 +117,55 @@ SBCursorPosition >> insertCursorIn: aBlock near: anotherBlock before: aBoolean d
 ]
 
 { #category : #'as yet unclassified' }
-SBCursorPosition >> leaveIn: anEditor [
+SBCursorPosition >> isDistinctFrom: aPosition [
+
+	^ self ~= aPosition
+]
+
+{ #category : #testing }
+SBCursorPosition >> isInsert [
+
+	^ false
+]
+
+{ #category : #testing }
+SBCursorPosition >> isMultiSelect [
+
+	^ false
+]
+
+{ #category : #testing }
+SBCursorPosition >> isSelect [
+
+	^ false
+]
+
+{ #category : #testing }
+SBCursorPosition >> isText [
+
+	^ false
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorPosition >> leaveIn: anEditor with: aCursor [
 
 	
 ]
 
+{ #category : #geometry }
+SBCursorPosition >> left [
+
+	^ self minimalBounds left
+]
+
 { #category : #'as yet unclassified' }
 SBCursorPosition >> maybeUpdateFor: aPosition [
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorPosition >> minimalBounds [
+
+	^ self subclassResponsibility
 ]
 
 { #category : #'as yet unclassified' }
@@ -129,23 +177,37 @@ SBCursorPosition >> mode [
 { #category : #'as yet unclassified' }
 SBCursorPosition >> moveCursorDown: aCursor [
 
-	aCursor nextVertical
-		ifNotNil: [:next |
-			aCursor
-				cursorPosition: (aCursor cursorForBlock: next at: (aCursor idealPixelPositionEnterNear: #top for: next))
-				explicitMove: true
-				axis: #y]
-		ifNil: [aCursor moveCursorSmaller]
+	SBBlockCursor legacyVerticalMovement
+		ifTrue: [
+			aCursor nextVertical
+				ifNotNil: [:next |
+					aCursor
+						cursorPosition: (aCursor cursorForBlock: next at: (aCursor idealPixelPositionEnterNear: #top for: next))
+						explicitMove: true
+						axis: #y]
+				ifNil: [aCursor moveCursorSmaller]]
+		ifFalse: [
+			aCursor nextVerticalCursor
+				ifNotNil: [:pos |
+					pos pixelPosition: (aCursor idealPixelPositionEnterNear: #top for: pos block).
+					aCursor cursorPosition: pos explicitMove: true axis: #y]
+				ifNil: [aCursor moveCursorSmaller]]
 ]
 
 { #category : #'as yet unclassified' }
 SBCursorPosition >> moveCursorUp: aCursor [
 
-	aCursor previousVertical ifNotNil: [:previous |
-		aCursor
-			cursorPosition: (aCursor cursorForBlock: previous at: (aCursor idealPixelPositionEnterNear: #bottom for: previous))
-			explicitMove: true
-			axis: #y]
+	SBBlockCursor legacyVerticalMovement
+		ifTrue: [
+			aCursor previousVertical ifNotNil: [:previous |
+				aCursor
+					cursorPosition: (aCursor cursorForBlock: previous at: (aCursor idealPixelPositionEnterNear: #bottom for: previous))
+					explicitMove: true
+					axis: #y]]
+		ifFalse: [
+			aCursor previousVerticalCursor ifNotNil: [:pos |
+				pos pixelPosition: (aCursor idealPixelPositionEnterNear: #bottom for: pos block).
+				aCursor cursorPosition: pos explicitMove: true axis: #y]]
 ]
 
 { #category : #'as yet unclassified' }
@@ -167,9 +229,21 @@ SBCursorPosition >> navigationRootIn: anEditor [
 ]
 
 { #category : #'as yet unclassified' }
+SBCursorPosition >> pixelPosition: aPoint [
+
+	
+]
+
+{ #category : #'as yet unclassified' }
 SBCursorPosition >> placeAtEnd: aBoolean [
 
 	
+]
+
+{ #category : #geometry }
+SBCursorPosition >> right [
+
+	^ self minimalBounds right
 ]
 
 { #category : #'as yet unclassified' }
@@ -200,6 +274,12 @@ SBCursorPosition >> selectionBounds [
 SBCursorPosition >> startOrAddToMultiSelection: aBlock [
 
 	^ SBCursorMultiSelect new start: aBlock
+]
+
+{ #category : #geometry }
+SBCursorPosition >> top [
+
+	^ self minimalBounds top
 ]
 
 { #category : #'as yet unclassified' }

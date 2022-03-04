@@ -14,7 +14,8 @@ Class {
 		'blockBounds',
 		'onApply',
 		'floatingMorphs',
-		'onMove'
+		'onMove',
+		'transferContainer'
 	],
 	#category : #'Sandblocks-Core'
 }
@@ -35,6 +36,7 @@ SBDragHelper >> applyHintAt: anEvent [
 
 	onLeave ifNotNil: [onLeave value].
 	onMove := nil.
+	transferContainer applyDrag.
 	^ onApply
 		ifNotNil: [
 			onApply cull: anEvent.
@@ -178,12 +180,13 @@ SBDragHelper >> hintInsertOf: aBlock in: aParentBlock near: aChildBlock before: 
 
 	| command insertPreviewMarker |
 	command := aParentBlock insertCommandRequest: aBlock near: aChildBlock before: aBoolean.
+	self assert: command notNil.
 	SBPreferences previewDropInsert ifTrue: [command do] ifFalse: [
 		insertPreviewMarker := SBDropInsertMarker new
 			color: (aParentBlock colorPolicy dropMarkerColorFor: aBlock);
 			bounds: (aChildBlock
 				ifNil: [10 @ 10 center: aParentBlock boundsInWorld center]
-				ifNotNil: [self insertMarkerFor: aChildBlock before: aBoolean]);
+				ifNotNil: [aChildBlock transformFromWorld transformRect: command hintBounds]);
 			openInWorld].
 	
 	onMove := [:event | (aChildBlock notNil and: [insertPreviewMarker notNil and: [aChildBlock floating]]) ifTrue: [insertPreviewMarker center: event position]].
@@ -229,31 +232,11 @@ SBDragHelper >> initialize [
 ]
 
 { #category : #'as yet unclassified' }
-SBDragHelper >> insertMarkerFor: aBlock before: aBoolean [
-
-	| horizontal b width |
-	aBlock floating ifTrue: [^ 10 @ 10 center: aBlock center].
-	
-	horizontal := aBlock parentSandblock hasHorizontalLayout.
-	b := aBlock boundsInWorld.
-	width := 6.
-	
-	^ aBoolean
-		ifTrue: [
-			horizontal
-				ifTrue: [b topLeft - (width @ 0) corner: b bottomLeft]
-				ifFalse: [b topLeft - (0 @ width) corner: b topRight]]
-		ifFalse: [
-			horizontal
-				ifTrue: [b topRight corner: b bottomRight + (width @ 0)]
-				ifFalse: [b bottomLeft corner: b bottomRight + (0 @ width)]]
-]
-
-{ #category : #'as yet unclassified' }
 SBDragHelper >> morph: aMorph [
 
 	((aMorph isSandblock and: [aMorph isSelection]) or: [aMorph isKindOf: TransferMorph]) ifFalse: [^ false].
 	
+	transferContainer := aMorph.
 	morph := aMorph unpackSelection.
 	^ true
 ]
@@ -274,7 +257,10 @@ SBDragHelper >> mouseMove: anEvent [
 						ifFalse: [
 							self closestAdjacentTo: anEvent position in: blockAtCursor do: [:adjacent :before |
 								(morph
-									convertedFor: (blockAtCursor objectInterfaceNear: adjacent at: (before ifTrue: [#before] ifFalse: [#after]))
+									convertedFor: (blockAtCursor
+										objectInterfaceForDrop: morph
+										near: adjacent
+										at: (before ifTrue: [#before] ifFalse: [#after]))
 									do: [:res | {#insert. blockAtCursor. adjacent. before. res}]) ifNil: [{#replace. blockAtCursor}]]]]]
 		ifNil: [#(#none nil)].
 	

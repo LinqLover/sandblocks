@@ -4,7 +4,8 @@ Class {
 	#instVars : [
 		'stream',
 		'content',
-		'categories'
+		'categories',
+		'search'
 	],
 	#category : #'Sandblocks-Core'
 }
@@ -22,64 +23,6 @@ SBPaletteContainer class >> matchesBlock: aBlock [
 ]
 
 { #category : #'as yet unclassified' }
-SBPaletteContainer >> addBlock: aString as: aBlock [
-
-	| block |
-	"addMorphBack: (SBStringMorph new contents: aString);"
-	block := (aBlock isInlineBlock and: [aBlock factory rootRuleName = aBlock type])
-		ifTrue: [aBlock childSandblocks first]
-		ifFalse: [aBlock].
-	content addMorphBack: (self container: block label: aString)
-]
-
-{ #category : #'as yet unclassified' }
-SBPaletteContainer >> addHeader: aString [
-
-	categories submorphs ifNotEmpty: [
-		categories addMorphBack: (Morph new
-			color: Color transparent;
-			height: 8)].
-	categories addMorphBack: (SBStringMorph new
-		contents: aString;
-		bold)
-]
-
-{ #category : #'as yet unclassified' }
-SBPaletteContainer >> addSectionHeader: aString [
-
-	| header |
-	header := SBStringMorph new
-		contents: aString;
-		bold.
-	content hasSubmorphs ifTrue: [
-		content addMorphBack: (Morph new
-			color: Color transparent;
-			height: 16)].
-	content addMorphBack: header.
-	categories addMorphBack: (SBStringMorph new
-		contents: aString;
-		on: #click send: #scrollToSection:event:morph: to: self withValue: header).
-	content addMorphBack: (Morph new
-		color: Color transparent;
-		height: 4)
-]
-
-{ #category : #'as yet unclassified' }
-SBPaletteContainer >> container: aBlock label: aString [
-
-	^ SBPalettePreviewContainer new
-		methodClass: nil;
-		label: aString;
-		addMorphBack: (self markCopyPlaceholder: aBlock)
-]
-
-{ #category : #'as yet unclassified' }
-SBPaletteContainer >> grammarHandler [
-
-	^ self subclassResponsibility
-]
-
-{ #category : #'as yet unclassified' }
 SBPaletteContainer >> initialize [
 
 	super initialize.
@@ -88,10 +31,20 @@ SBPaletteContainer >> initialize [
 		addMorphBack: (categories := SBColumn new
 			layoutInset: 4;
 			cellPositioning: #topLeft);
-		addMorphBack: (ScrollPane new
-			color: Color transparent;
+		addMorphBack: (SBColumn new
+			addMorphBack: (search := SBTextBubble new
+				placeholderText: 'Search ...';
+				when: #contentsChanged send: #updateSearch to: self;
+				layoutInset: 2;
+				hResizing: #spaceFill);
+			addMorphBack: (ScrollPane new
+				color: Color transparent;
+				hResizing: #spaceFill;
+				vResizing: #spaceFill);
+			vResizing: #spaceFill;
 			hResizing: #spaceFill;
-			vResizing: #spaceFill);
+			cellGap: 4;
+			layoutInset: (SBEdgeInsets top: 4));
 		layoutInset: 0;
 		cellGap: 8;
 		hResizing: #shrinkWrap;
@@ -103,7 +56,7 @@ SBPaletteContainer >> initialize [
 		attachDecorator: SBMoveDecorator new;
 		attachDecorator: SBResizableDecorator new.
 	
-	self lastSubmorph scroller
+	self lastSubmorph lastSubmorph scroller
 		addMorphBack: (content := SBColumn new
 			useAlgebraLayout;
 			minimumWidth: 300;
@@ -119,14 +72,6 @@ SBPaletteContainer >> layoutCommands [
 	^ SBAlgebraCommand container
 		morph: self;
 		data: (self submorphs collect: #layoutCommands separatedBy: [SBAlgebraCommand hardLine])
-]
-
-{ #category : #'as yet unclassified' }
-SBPaletteContainer >> markCopyPlaceholder: aBlock [
-
-	(aBlock nextBlockThat: [:m | m isUnknown]) ifNotNil: [:m |
-		m setProperty: #copyPlaceholder toValue: true].
-	^ aBlock
 ]
 
 { #category : #'as yet unclassified' }
@@ -157,12 +102,6 @@ SBPaletteContainer >> pickUp: anEvent [
 ]
 
 { #category : #'as yet unclassified' }
-SBPaletteContainer >> scrollToSection: aBlock event: anEvent morph: aMorph [
-
-	content owner owner vScrollBar setValue: aBlock top
-]
-
-{ #category : #'as yet unclassified' }
 SBPaletteContainer >> selectedBlock [
 
 	^ nil
@@ -172,4 +111,28 @@ SBPaletteContainer >> selectedBlock [
 SBPaletteContainer >> specialDropCommand: aBlock [
 
 	^ SBDeleteCommand new target: aBlock
+]
+
+{ #category : #'as yet unclassified' }
+SBPaletteContainer >> submorph: aMorph matchesQuery: aString [
+
+	aMorph allMorphsDo: [:m |
+		((m respondsTo: #textContents) and: [m textContents asLowercase includesSubstring: aString]) ifTrue: [^ true].
+		((m respondsTo: #placeholderText) and: [m placeholderText asLowercase includesSubstring: aString]) ifTrue: [^ true].
+		m balloonText ifNotNil: [:text | (text asLowercase includesSubstring: aString) ifTrue: [^ true]]].
+	^ false
+]
+
+{ #category : #'as yet unclassified' }
+SBPaletteContainer >> updateSearch [
+
+	| query |
+	query := search contents asLowercase.
+	content submorphsDo: [:container |
+		container submorphsDo: [:m | | show |
+			show := query isEmpty or: [self submorph: m matchesQuery: query].
+			m
+				visible: show;
+				disableLayout: show not]].
+	content layoutChanged
 ]

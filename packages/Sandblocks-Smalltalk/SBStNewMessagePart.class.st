@@ -97,7 +97,7 @@ SBStNewMessagePart >> keyStroke: anEvent [
 				ifFalse: [self currentTextMorph deleteBeforeCursor].
 			^ self continueInputInArgument]].
 	
-	self valid ifTrue: [self updateSuggestions] ifFalse: [
+	self valid ifFalse: [
 		self currentTextMorph deleteBeforeCursor.
 		self argument
 			ifNotNil: [:a |
@@ -214,6 +214,17 @@ SBStNewMessagePart >> stopEditing: aCommand [
 ]
 
 { #category : #'as yet unclassified' }
+SBStNewMessagePart >> suggestions [
+
+	| selector |
+	selector := self selectorContentsBeforeMe, self contents.
+	
+	(selector notEmpty and: [selector last = $:]) ifTrue: [selector := selector allButLast].
+	
+	^ self messageSend actualReceiver completionSuggestionsForSend: selector
+]
+
+{ #category : #'as yet unclassified' }
 SBStNewMessagePart >> unaryToKeywordCommand [
 
 	^ SBInsertCommand new
@@ -223,22 +234,9 @@ SBStNewMessagePart >> unaryToKeywordCommand [
 ]
 
 { #category : #'as yet unclassified' }
-SBStNewMessagePart >> updateSuggestions [
+SBStNewMessagePart >> useSuggestion: anItem [
 
-	| selector |
-	selector := self selectorContentsBeforeMe, self contents ifEmpty: [^ self].
-	
-	selector last = $: ifTrue: [selector := selector allButLast].
-	
-	self
-		updateSuggestions: ((self messageSend actualReceiver completionSuggestionsFor: selector) collect: [:sel | SBSuggestionItem selector: sel label: 'send'])
-		showNear: self
-]
-
-{ #category : #'as yet unclassified' }
-SBStNewMessagePart >> useSuggestion: aString [
-
-	self messageSend useSuggestion: aString
+	self messageSend useSuggestion: anItem contents
 ]
 
 { #category : #'as yet unclassified' }

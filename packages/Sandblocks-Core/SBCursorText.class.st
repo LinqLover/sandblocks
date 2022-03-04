@@ -75,7 +75,7 @@ SBCursorText >> cursorIndex: aNumber [
 ]
 
 { #category : #'as yet unclassified' }
-SBCursorText >> drawOn: aCanvas in: aRectangle [
+SBCursorText >> drawOn: aCanvas in: aRectangle color: aColor [
 
 	| stroke |
 	stroke := self block frameSize.
@@ -83,16 +83,16 @@ SBCursorText >> drawOn: aCanvas in: aRectangle [
 		line: aRectangle bottomLeft - (-1 @ stroke)
 		to: aRectangle bottomRight - (1 @ stroke)
 		width: stroke
-		color: self color negated.
+		color: aColor negated.
 	aCanvas
 		line: aRectangle bottomLeft - (-1 @ (stroke * 2))
 		to: aRectangle bottomRight - (1 @ (stroke * 2))
 		width: stroke
-		color: self color
+		color: aColor
 ]
 
 { #category : #'as yet unclassified' }
-SBCursorText >> enter [
+SBCursorText >> enterWith: aCursor [
 
 	replacingContents ifTrue: [self block currentTextMorph contents: ''].
 	self block currentTextMorph moveCursorTo: self cursorIndex
@@ -129,8 +129,14 @@ SBCursorText >> initialize [
 	cursorIndex := 1
 ]
 
+{ #category : #testing }
+SBCursorText >> isText [
+
+	^ true
+]
+
 { #category : #'as yet unclassified' }
-SBCursorText >> leaveIn: anEditor [
+SBCursorText >> leaveIn: anEditor with: aCursor [
 
 	self applyCommandIn: anEditor.
 	self block currentTextMorph stopEditing
@@ -141,6 +147,12 @@ SBCursorText >> maybeUpdateFor: aPosition [
 
 	self cursorIndex: aPosition cursorIndex.
 	self block currentTextMorph moveCursorTo: self cursorIndex
+]
+
+{ #category : #'as yet unclassified' }
+SBCursorText >> minimalBounds [
+
+	^ self block bounds
 ]
 
 { #category : #'as yet unclassified' }
@@ -179,7 +191,9 @@ SBCursorText >> moveHorizontal: aNumber wordWise: aBoolean [
 { #category : #'as yet unclassified' }
 SBCursorText >> pixelPosition: aPoint [
 
-	cursorIndex := (self block currentTextMorph cursorIndexForPosition: aPoint) max: 1
+	cursorIndex := aPoint
+		ifNotNil: [(self block currentTextMorph cursorIndexForPosition: aPoint) max: 1]
+		ifNil: [1]
 ]
 
 { #category : #'as yet unclassified' }
